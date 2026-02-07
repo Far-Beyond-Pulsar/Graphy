@@ -72,7 +72,7 @@ pub mod utils;
 pub use core::{
     GraphDescription, NodeInstance, Connection, Pin, PinInstance,
     DataType, NodeTypes, Position, ConnectionType, PropertyValue,
-    GraphMetadata,
+    GraphMetadata, NodeMetadata, ParamInfo, NodeMetadataProvider, PinType,
 };
 
 pub use analysis::{
