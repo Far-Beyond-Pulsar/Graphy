@@ -391,30 +391,155 @@ fn on_start() {
 
 ---
 
-## ⚡ Performance
+## ⚡ Performance & Thread Pool Options
 
-Graphy is designed for high performance with both sequential and parallel processing modes.
+Graphy provides both sequential and parallel processing modes with configurable thread pools.
 
-### Sequential Mode (Default)
-- **Best for:** Interactive editing, graphs < 2,000 nodes
-- **Complexity:** O(V + E) for all analysis passes
-- **Latency:** < 5ms for typical graphs (100-500 nodes)
+### Performance Characteristics
 
-### Parallel Mode (Opt-in)
-- **Best for:** Large graphs (2,000+ nodes), batch processing
-- **Speedup:** Up to 1.5x faster for 6,400+ nodes
-- **Trade-off:** Thread overhead makes it slower for small graphs
+**Latest Benchmark Results:**
+
+| Graph Size | Sequential | Parallel | Speedup | Recommendation |
+|-----------|-----------|----------|---------|----------------|
+| 900 nodes (30×30) | 1.81 ms | 3.47 ms | 0.52x | ❌ Use Sequential |
+| 2,500 nodes (50×50) | 7.75 ms | 8.30 ms | 0.93x | ❌ Use Sequential |
+| 4,900 nodes (70×70) | 21.38 ms | 18.60 ms | 1.15x | ✅ Use Parallel |
+| 10,000 nodes (100×100) | 60.74 ms | 32.44 ms | **1.87x** | ✅ Use Parallel |
+
+**Rule of Thumb:** Use parallel processing for graphs with **5,000+ nodes**.
+
+### API Options
+
+#### 1. Sequential Mode (Default)
+Best for interactive editing and small graphs.
 
 ```rust
-// Automatic selection based on graph size
-let resolver = if graph.nodes.len() > 2000 {
+use graphy::{DataResolver, GraphDescription};
+
+let resolver = DataResolver::build(&graph, &provider)?;
+```
+
+**When to use:**
+- ✅ Interactive UI (< 5,000 nodes)
+- ✅ Low latency required
+- ✅ Single-threaded environments
+- ✅ Quick analysis (< 10ms target)
+
+#### 2. Parallel Mode (Opt-in)
+Best for large graphs and batch processing.
+
+```rust
+use graphy::{DataResolver, GraphDescription};
+
+let resolver = DataResolver::build_parallel(&graph, &provider)?;
+```
+
+**When to use:**
+- ✅ Large graphs (5,000+ nodes)
+- ✅ Batch compilation
+- ✅ Multi-core systems available
+- ✅ Maximum throughput needed
+
+#### 3. Smart Auto-Selection
+Automatically choose based on graph size.
+
+```rust
+use graphy::{DataResolver, GraphDescription};
+
+let resolver = if graph.nodes.len() >= 5000 {
     DataResolver::build_parallel(&graph, &provider)?
 } else {
     DataResolver::build(&graph, &provider)?
 };
 ```
 
-See [Performance Documentation](docs/PARALLEL_PERFORMANCE.md) for detailed benchmarks.
+**When to use:**
+- ✅ Variable graph sizes
+- ✅ Unknown input sizes
+- ✅ General-purpose libraries
+
+### Thread Pool Configuration
+
+Pre-initialize the thread pool for predictable performance:
+
+```rust
+use graphy::parallel::{init_thread_pool, ThreadPoolConfig};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize at application startup
+    let config = ThreadPoolConfig::new()
+        .with_num_threads(8)                    // Explicit thread count
+        .with_stack_size(2 * 1024 * 1024);      // 2MB per thread
+    
+    init_thread_pool(config)?;
+    
+    // Now all parallel operations use pre-warmed threads
+    // ... rest of your application
+    Ok(())
+}
+```
+
+**Configuration Options:**
+
+```rust
+// Auto-detect CPU cores (recommended)
+let config = ThreadPoolConfig::new();
+
+// Explicit thread count
+let config = ThreadPoolConfig::new().with_num_threads(16);
+
+// Custom stack size (for deep recursion)
+let config = ThreadPoolConfig::new().with_stack_size(4 * 1024 * 1024);
+
+// Get thread count that will be used
+let num_threads = config.get_num_threads();
+```
+
+**Benefits of pre-initialization:**
+- 🎯 Predictable performance (no cold-start variance)
+- ⚙️ Control over thread count and stack size
+- 🚀 Threads ready immediately
+- 💾 One-time memory allocation
+
+### Real-World Usage Patterns
+
+#### Interactive Visual Editor
+```rust
+// Always use sequential for UI responsiveness
+let resolver = DataResolver::build(&graph, &provider)?;
+// Expected: < 5ms for typical graphs
+```
+
+#### Shader Compiler
+```rust
+// Smart selection for variable complexity
+let resolver = if graph.nodes.len() >= 5000 {
+    DataResolver::build_parallel(&graph, &provider)?
+} else {
+    DataResolver::build(&graph, &provider)?
+};
+// Expected: 5-50ms depending on size
+```
+
+#### Build System / Batch Processing
+```rust
+// Pre-initialize at startup
+init_thread_pool(ThreadPoolConfig::new())?;
+
+// Always use parallel
+let resolver = DataResolver::build_parallel(&graph, &provider)?;
+// Expected: 30-200ms for large graphs
+```
+
+### Memory Overhead
+
+| Threads | Stack Memory | Total Overhead |
+|---------|-------------|----------------|
+| 4 threads | 8 MB | ~10 MB |
+| 8 threads | 16 MB | ~20 MB |
+| 16 threads | 32 MB | ~40 MB |
+
+*One-time cost for application lifetime*
 
 ### Benchmarks
 
@@ -424,18 +549,14 @@ Run the comprehensive benchmark suite:
 # Run all benchmarks
 cargo bench
 
-# Run specific benchmark
-cargo bench monster_graph
-cargo bench parallel_scaling
+# Specific benchmarks
+cargo bench monster_graph          # Large graph stress test
+cargo bench parallel_scaling       # Sequential vs parallel comparison
+cargo bench threadpool_bench       # Thread pool optimization tests
 
-# Run stress test
+# Interactive stress test
 cargo run --example stress_test --release
 ```
-
-**Sample Results** (80×80 grid, 6,400 nodes):
-- Sequential: 28.47 ms
-- Parallel: 19.26 ms
-- **Speedup: 1.48x** ✨
 
 ---
 

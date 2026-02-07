@@ -160,8 +160,7 @@ pub fn num_threads() -> usize {
     get_thread_pool().current_num_threads()
 }
 
-// Re-export rayon's parallel iterator for convenience
-use rayon::prelude::*;
+// Re-export commonly used rayon types for parallel operations
 pub use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 #[cfg(test)]
