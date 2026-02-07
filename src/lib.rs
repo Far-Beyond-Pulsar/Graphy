@@ -67,6 +67,7 @@ pub mod core;
 pub mod analysis;
 pub mod generation;
 pub mod utils;
+pub mod parallel;
 
 // Re-export commonly used types
 pub use core::{

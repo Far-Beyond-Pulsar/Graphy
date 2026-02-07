@@ -1,9 +1,12 @@
 //! # Data Flow Analysis
 //!
 //! Resolves data dependencies and determines evaluation order.
+//! 
+//! Includes both single-threaded and parallel implementations for performance.
 
 use crate::core::*;
 use crate::GraphyError;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Where an input value comes from
@@ -35,7 +38,7 @@ pub struct DataResolver {
 }
 
 impl DataResolver {
-    /// Build a data resolver from a graph
+    /// Build a data resolver from a graph (single-threaded)
     ///
     /// # Arguments
     ///
@@ -58,6 +61,46 @@ impl DataResolver {
         resolver.generate_variable_names(graph);
 
         // Phase 3: Determine evaluation order for pure nodes
+        resolver.compute_pure_evaluation_order(graph, metadata_provider)?;
+
+        Ok(resolver)
+    }
+
+    /// Build a data resolver from a graph (parallel version)
+    ///
+    /// Uses a dedicated thread pool for parallel processing of independent operations.
+    /// Significantly faster for large graphs (2000+ nodes).
+    ///
+    /// Call `graphy::parallel::init_thread_pool()` at startup to eliminate cold-start overhead.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The graph to analyze
+    /// * `metadata_provider` - Provider for node metadata
+    pub fn build_parallel<P: NodeMetadataProvider + Sync>(
+        graph: &GraphDescription,
+        metadata_provider: &P,
+    ) -> Result<Self, GraphyError> {
+        let mut resolver = DataResolver {
+            input_sources: HashMap::new(),
+            result_variables: HashMap::new(),
+            pure_evaluation_order: Vec::new(),
+        };
+
+        // Use the pre-warmed thread pool
+        let pool = crate::parallel::get_thread_pool();
+        
+        pool.install(|| {
+            // Phase 1: Map all data connections (parallel)
+            resolver.map_data_connections_parallel(graph)?;
+
+            // Phase 2: Generate variable names (parallel)
+            resolver.generate_variable_names_parallel(graph);
+
+            Ok::<(), GraphyError>(())
+        })?;
+
+        // Phase 3: Determine evaluation order for pure nodes (sequential)
         resolver.compute_pure_evaluation_order(graph, metadata_provider)?;
 
         Ok(resolver)
@@ -106,6 +149,65 @@ impl DataResolver {
             let var_name = format!("node_{}_result", sanitize_var_name(node_id));
             self.result_variables.insert(node_id.clone(), var_name);
         }
+    }
+
+    /// Parallel version: Map data connections using rayon
+    fn map_data_connections_parallel(&mut self, graph: &GraphDescription) -> Result<(), GraphyError> {
+        // Process data connections in parallel
+        let data_sources: Vec<_> = graph.connections
+            .par_iter()
+            .filter(|c| matches!(c.connection_type, ConnectionType::Data))
+            .map(|connection| {
+                let key = (connection.target_node.clone(), connection.target_pin.clone());
+                let source = DataSource::Connection {
+                    source_node_id: connection.source_node.clone(),
+                    source_pin: connection.source_pin.clone(),
+                };
+                (key, source)
+            })
+            .collect();
+
+        self.input_sources.extend(data_sources);
+
+        // Process unconnected inputs in parallel
+        let default_sources: Vec<_> = graph.nodes
+            .par_iter()
+            .flat_map(|(node_id, node)| {
+                node.inputs
+                    .par_iter()
+                    .filter_map(|pin_instance| {
+                        let pin_name = &pin_instance.id;
+                        let key = (node_id.clone(), pin_name.clone());
+                        
+                        if !self.input_sources.contains_key(&key) {
+                            if let Some(prop_value) = node.properties.get(pin_name) {
+                                Some((key, DataSource::Constant(property_value_to_string(prop_value))))
+                            } else {
+                                Some((key, DataSource::Default))
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        self.input_sources.extend(default_sources);
+        Ok(())
+    }
+
+    /// Parallel version: Generate variable names using rayon
+    fn generate_variable_names_parallel(&mut self, graph: &GraphDescription) {
+        let var_names: Vec<_> = graph.nodes
+            .par_iter()
+            .map(|(node_id, _node)| {
+                let var_name = format!("node_{}_result", sanitize_var_name(node_id));
+                (node_id.clone(), var_name)
+            })
+            .collect();
+
+        self.result_variables.extend(var_names);
     }
 
     /// Compute evaluation order for pure nodes using topological sort

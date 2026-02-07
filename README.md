@@ -28,8 +28,9 @@ Whether you're building a visual scripting system, shader graph editor, or compu
 - 🎨 **Target-Agnostic** - Support Rust, WGSL, or implement your own code generator
 - 🧩 **Extensible Architecture** - Trait-based design for custom nodes and languages
 - 📊 **Smart Analysis** - Topological sorting, cycle detection, and dependency resolution
+- ⚡ **Parallel Processing** - Multi-threaded analysis with Rayon for large graphs (1.5x speedup at 6400+ nodes)
 - 🔒 **Type-Safe** - Full type information tracking and validation
-- ⚡ **Optimized Output** - Pure function inlining and execution flow optimization
+- 🎯 **Optimized Output** - Pure function inlining and execution flow optimization
 
 ---
 
@@ -119,7 +120,13 @@ graph.add_connection(Connection {
 
 // 4. Analyze the graph
 let metadata_provider = MyMetadataProvider::new();
+
+// For small graphs (< 2000 nodes) - use sequential
 let data_resolver = DataResolver::build(&graph, &metadata_provider)?;
+
+// For large graphs (2000+ nodes) - use parallel processing
+// let data_resolver = DataResolver::build_parallel(&graph, &metadata_provider)?;
+
 let exec_routing = ExecutionRouting::build(&graph, &metadata_provider)?;
 
 // 5. Generate code
@@ -381,6 +388,54 @@ fn on_start() {
                                   ▲
                     [Previous] ───┘
 ```
+
+---
+
+## ⚡ Performance
+
+Graphy is designed for high performance with both sequential and parallel processing modes.
+
+### Sequential Mode (Default)
+- **Best for:** Interactive editing, graphs < 2,000 nodes
+- **Complexity:** O(V + E) for all analysis passes
+- **Latency:** < 5ms for typical graphs (100-500 nodes)
+
+### Parallel Mode (Opt-in)
+- **Best for:** Large graphs (2,000+ nodes), batch processing
+- **Speedup:** Up to 1.5x faster for 6,400+ nodes
+- **Trade-off:** Thread overhead makes it slower for small graphs
+
+```rust
+// Automatic selection based on graph size
+let resolver = if graph.nodes.len() > 2000 {
+    DataResolver::build_parallel(&graph, &provider)?
+} else {
+    DataResolver::build(&graph, &provider)?
+};
+```
+
+See [Performance Documentation](docs/PARALLEL_PERFORMANCE.md) for detailed benchmarks.
+
+### Benchmarks
+
+Run the comprehensive benchmark suite:
+
+```bash
+# Run all benchmarks
+cargo bench
+
+# Run specific benchmark
+cargo bench monster_graph
+cargo bench parallel_scaling
+
+# Run stress test
+cargo run --example stress_test --release
+```
+
+**Sample Results** (80×80 grid, 6,400 nodes):
+- Sequential: 28.47 ms
+- Parallel: 19.26 ms
+- **Speedup: 1.48x** ✨
 
 ---
 

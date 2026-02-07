@@ -6,6 +6,22 @@ use graphy::{
 };
 use std::collections::HashMap;
 
+// Initialize thread pool once for all benchmarks
+fn init_benchmark_environment() {
+    use graphy::parallel::{init_thread_pool, ThreadPoolConfig};
+    
+    // Initialize with optimal settings for benchmarking
+    let config = ThreadPoolConfig::new()
+        .with_num_threads(
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(8)
+        )
+        .with_stack_size(2 * 1024 * 1024);
+    
+    let _ = init_thread_pool(config); // Ignore if already initialized
+}
+
 // ============================================================================
 // Mock Metadata Provider for Benchmarks
 // ============================================================================
@@ -428,16 +444,26 @@ fn create_monster_graph(scale: usize) -> GraphDescription {
 // ============================================================================
 
 fn bench_linear_chain(c: &mut Criterion) {
+    init_benchmark_environment(); // Pre-warm thread pool
+    
     let mut group = c.benchmark_group("linear_chain_analysis");
     let provider = BenchmarkMetadataProvider::new();
 
     for size in [10, 50, 100, 500, 1000].iter() {
         group.throughput(Throughput::Elements(*size as u64));
         
-        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
-            let graph = create_linear_chain(size);
+        let graph = create_linear_chain(*size);
+        
+        group.bench_with_input(BenchmarkId::new("sequential", size), size, |b, &_size| {
             b.iter(|| {
                 let data_resolver = DataResolver::build(black_box(&graph), black_box(&provider)).unwrap();
+                black_box(data_resolver);
+            });
+        });
+        
+        group.bench_with_input(BenchmarkId::new("parallel", size), size, |b, &_size| {
+            b.iter(|| {
+                let data_resolver = DataResolver::build_parallel(black_box(&graph), black_box(&provider)).unwrap();
                 black_box(data_resolver);
             });
         });
@@ -446,16 +472,26 @@ fn bench_linear_chain(c: &mut Criterion) {
 }
 
 fn bench_wide_graph(c: &mut Criterion) {
+    init_benchmark_environment(); // Pre-warm thread pool
+    
     let mut group = c.benchmark_group("wide_graph_analysis");
     let provider = BenchmarkMetadataProvider::new();
 
     for width in [10, 25, 50, 100, 200].iter() {
         group.throughput(Throughput::Elements(*width as u64));
         
-        group.bench_with_input(BenchmarkId::from_parameter(width), width, |b, &width| {
-            let graph = create_wide_graph(width);
+        let graph = create_wide_graph(*width);
+        
+        group.bench_with_input(BenchmarkId::new("sequential", width), width, |b, &_width| {
             b.iter(|| {
                 let data_resolver = DataResolver::build(black_box(&graph), black_box(&provider)).unwrap();
+                black_box(data_resolver);
+            });
+        });
+        
+        group.bench_with_input(BenchmarkId::new("parallel", width), width, |b, &_width| {
+            b.iter(|| {
+                let data_resolver = DataResolver::build_parallel(black_box(&graph), black_box(&provider)).unwrap();
                 black_box(data_resolver);
             });
         });
@@ -500,6 +536,8 @@ fn bench_control_flow(c: &mut Criterion) {
 }
 
 fn bench_monster_graph(c: &mut Criterion) {
+    init_benchmark_environment(); // Pre-warm thread pool
+    
     let mut group = c.benchmark_group("monster_graph_analysis");
     group.sample_size(10); // Reduce sample size for large graphs
     let provider = BenchmarkMetadataProvider::new();
@@ -508,10 +546,18 @@ fn bench_monster_graph(c: &mut Criterion) {
         let num_nodes = scale * scale;
         group.throughput(Throughput::Elements(num_nodes as u64));
         
-        group.bench_with_input(BenchmarkId::from_parameter(scale), scale, |b, &scale| {
-            let graph = create_monster_graph(scale);
+        let graph = create_monster_graph(*scale);
+        
+        group.bench_with_input(BenchmarkId::new("sequential", scale), scale, |b, &_scale| {
             b.iter(|| {
                 let data_resolver = DataResolver::build(black_box(&graph), black_box(&provider)).unwrap();
+                black_box(data_resolver);
+            });
+        });
+        
+        group.bench_with_input(BenchmarkId::new("parallel", scale), scale, |b, &_scale| {
+            b.iter(|| {
+                let data_resolver = DataResolver::build_parallel(black_box(&graph), black_box(&provider)).unwrap();
                 black_box(data_resolver);
             });
         });
@@ -563,6 +609,37 @@ fn bench_full_pipeline(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_parallel_scaling(c: &mut Criterion) {
+    init_benchmark_environment(); // Pre-warm thread pool
+    
+    let mut group = c.benchmark_group("parallel_scaling");
+    group.sample_size(20);
+    let provider = BenchmarkMetadataProvider::new();
+
+    // Test where parallel really shines: massive grids
+    for scale in [20, 40, 60, 80, 100].iter() {
+        let num_nodes = scale * scale;
+        group.throughput(Throughput::Elements(num_nodes as u64));
+        
+        let graph = create_monster_graph(*scale);
+        
+        group.bench_with_input(BenchmarkId::new("sequential", scale), scale, |b, &_scale| {
+            b.iter(|| {
+                let data_resolver = DataResolver::build(black_box(&graph), black_box(&provider)).unwrap();
+                black_box(data_resolver);
+            });
+        });
+        
+        group.bench_with_input(BenchmarkId::new("parallel", scale), scale, |b, &_scale| {
+            b.iter(|| {
+                let data_resolver = DataResolver::build_parallel(black_box(&graph), black_box(&provider)).unwrap();
+                black_box(data_resolver);
+            });
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_linear_chain,
@@ -572,6 +649,7 @@ criterion_group!(
     bench_monster_graph,
     bench_graph_serialization,
     bench_full_pipeline,
+    bench_parallel_scaling,
 );
 
 criterion_main!(benches);

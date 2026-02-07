@@ -165,16 +165,29 @@ fn run_stress_test(name: &str, graph: &GraphDescription, provider: &StressTestPr
     let deserialize_time = start.elapsed();
     println!("  📄 Deserialization: {:?}", deserialize_time);
 
-    // Test data flow analysis
+    // Test data flow analysis - Sequential
     let start = Instant::now();
     match DataResolver::build(&graph, provider) {
         Ok(_resolver) => {
             let analysis_time = start.elapsed();
-            println!("  ✅ Data Flow Analysis: {:?}", analysis_time);
+            println!("  ✅ Data Flow Analysis (Sequential): {:?}", analysis_time);
         }
         Err(e) => {
             let analysis_time = start.elapsed();
             println!("  ❌ Data Flow Analysis Failed: {:?} after {:?}", e, analysis_time);
+        }
+    }
+
+    // Test data flow analysis - Parallel
+    let start = Instant::now();
+    match DataResolver::build_parallel(&graph, provider) {
+        Ok(_resolver) => {
+            let analysis_time = start.elapsed();
+            println!("  ⚡ Data Flow Analysis (Parallel): {:?}", analysis_time);
+        }
+        Err(e) => {
+            let analysis_time = start.elapsed();
+            println!("  ❌ Parallel Analysis Failed: {:?} after {:?}", e, analysis_time);
         }
     }
 
@@ -192,6 +205,20 @@ fn run_stress_test(name: &str, graph: &GraphDescription, provider: &StressTestPr
 fn main() {
     println!("\n🔥🔥🔥 GRAPHY STRESS TEST 🔥🔥🔥\n");
     println!("Let's push this library to its limits!\n");
+
+    // Pre-initialize thread pool for zero-overhead parallel processing
+    println!("⚡ Initializing thread pool...");
+    let num_cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    
+    use graphy::parallel::{init_thread_pool, ThreadPoolConfig};
+    let config = ThreadPoolConfig::new()
+        .with_num_threads(num_cpus)
+        .with_stack_size(2 * 1024 * 1024);
+    
+    init_thread_pool(config).expect("Failed to initialize thread pool");
+    println!("✅ Thread pool ready with {} threads\n", num_cpus);
 
     let provider = StressTestProvider::new();
 

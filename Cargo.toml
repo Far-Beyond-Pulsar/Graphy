@@ -21,10 +21,17 @@ tracing = "0.1"
 # Error handling
 thiserror = "1.0"
 
+# Parallelism
+rayon = "1.11"
+
 [dev-dependencies]
 tracing-subscriber = "0.3"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
 name = "graph_benchmarks"
+harness = false
+
+[[bench]]
+name = "threadpool_bench"
 harness = false
