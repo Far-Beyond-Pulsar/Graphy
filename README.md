@@ -424,29 +424,6 @@ let var2 = gen.generate("result");  // "result_1"
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/Trident-For-U/Graphy.git
-cd Graphy
-
-# Build the project
-cargo build
-
-# Run tests
-cargo test
-
-# Run examples
-cargo run --example basic_graph
-```
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -467,13 +444,6 @@ of this software and associated documentation files...
 - Built with ❤️ by the Pulsar Team
 - Inspired by visual programming paradigms in Unreal Engine Blueprints, Unity Visual Scripting, and Blender Geometry Nodes
 - Powered by the Rust ecosystem: `syn`, `quote`, `serde`, and `thiserror`
-
----
-
-## 📞 Contact & Support
-
-- **Issues**: [GitHub Issues](https://github.com/Trident-For-U/Graphy/issues)
-- **Author**: Tristan Poland (Trident_For_U)
 
 ---
 
