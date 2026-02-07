@@ -1,0 +1,25 @@
+[package]
+name = "graphy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pulsar Team"]
+description = "General-purpose graph compilation library for node-based visual programming"
+license = "MIT"
+
+[dependencies]
+# AST parsing and manipulation
+syn = { version = "2.0", features = ["full", "visit", "visit-mut", "extra-traits"] }
+quote = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# Error handling
+thiserror = "1.0"
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
