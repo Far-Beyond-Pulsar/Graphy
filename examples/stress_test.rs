@@ -150,7 +150,7 @@ fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
 }
 
 fn run_stress_test(name: &str, graph: &GraphDescription, provider: &StressTestProvider) {
-    println!("\n{'='}━{'='}━{'='}━ {} {'='}━{'='}━{'='}━", name);
+    println!("\n========== {} ==========", name);
     println!("  Nodes: {}", graph.nodes.len());
     println!("  Connections: {}", graph.connections.len());
 
@@ -253,6 +253,6 @@ fn main() {
     println!("\n  Graph creation took: {:?}", creation_time);
     run_stress_test("💀 THE MONSTER", &monster, &provider);
 
-    println!("\n{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━{'='}━\n");
+    println!("\n============================================\n");
     println!("🎉 Stress test complete! Graphy survived! 🎉\n");
 }
