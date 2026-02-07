@@ -215,6 +215,9 @@ pub fn extract_exec_output_labels(function_source: &str) -> Result<Vec<String>, 
     let item_fn = parse_function(function_source)?;
     let mut extractor = ExecOutputLabelExtractor { labels: Vec::new() };
     extractor.visit_item_fn(&item_fn);
+    
+    tracing::debug!("[AST] Extracted {} exec_output labels", extractor.labels.len());
+    
     Ok(extractor.labels)
 }
 
@@ -223,7 +226,22 @@ struct ExecOutputLabelExtractor {
 }
 
 impl<'ast> Visit<'ast> for ExecOutputLabelExtractor {
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
+        // Check for macro statements (exec_output! as a statement)
+        if let Stmt::Macro(stmt_macro) = stmt {
+            if stmt_macro.mac.path.is_ident("exec_output") {
+                if let Ok(label) = syn::parse2::<syn::LitStr>(stmt_macro.mac.tokens.clone()) {
+                    self.labels.push(label.value());
+                }
+            }
+        }
+        
+        // Continue visiting nested statements and expressions
+        visit::visit_stmt(self, stmt);
+    }
+    
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        // Also check for macro expressions (exec_output! in expression position)
         if let Expr::Macro(ExprMacro { mac, .. }) = expr {
             if mac.path.is_ident("exec_output") {
                 if let Ok(label) = syn::parse2::<syn::LitStr>(mac.tokens.clone()) {
@@ -231,6 +249,8 @@ impl<'ast> Visit<'ast> for ExecOutputLabelExtractor {
                 }
             }
         }
+        
+        // Continue visiting nested expressions
         visit::visit_expr(self, expr);
     }
 }
