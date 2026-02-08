@@ -103,7 +103,7 @@ pub enum GraphyError {
     #[error("Type mismatch: expected {expected}, got {actual}")]
     TypeMismatch { expected: String, actual: String },
 
-    #[error("Cyclic dependency detected")]
+    #[error("Cyclic dependency detected, check your graph for looping code")]
     CyclicDependency,
 
     #[error("Invalid connection: {0}")]
