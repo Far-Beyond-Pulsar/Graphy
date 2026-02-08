@@ -354,19 +354,49 @@ fn edge_serde_special_chars_in_strings() {
 }
 
 #[test]
-fn edge_serde_nan_number() {
-    // NaN may or may not round-trip depending on serde_json config.
-    // Just verify serialization doesn't panic.
-    let pv = PropertyValue::Number(f64::NAN);
-    let _ = serde_json::to_string(&pv);
+fn edge_serde_nan_serializes_as_null() {
+    // JSON has no NaN representation. serde_json silently emits null,
+    // which means a round-trip will NOT preserve the original NaN value.
+    let json = serde_json::to_string(&PropertyValue::Number(f64::NAN)).unwrap();
+    assert!(
+        json.contains("null"),
+        "NaN should serialize as null in JSON, got: {}",
+        json
+    );
+
+    // Deserialization of the null-bearing JSON must fail or produce a
+    // different value, proving the round-trip is lossy.
+    let round_trip = serde_json::from_str::<PropertyValue>(&json);
+    assert!(
+        round_trip.is_err(),
+        "Deserializing NaN-as-null back into PropertyValue::Number should fail"
+    );
 }
 
 #[test]
-fn edge_serde_infinity() {
-    // Infinity may or may not round-trip depending on serde_json config.
-    // Just verify serialization doesn't panic.
-    let pv = PropertyValue::Number(f64::INFINITY);
-    let _ = serde_json::to_string(&pv);
+fn edge_serde_infinity_serializes_as_null() {
+    // JSON has no Infinity representation. serde_json silently emits null.
+    let json = serde_json::to_string(&PropertyValue::Number(f64::INFINITY)).unwrap();
+    assert!(
+        json.contains("null"),
+        "Infinity should serialize as null in JSON, got: {}",
+        json
+    );
+
+    let round_trip = serde_json::from_str::<PropertyValue>(&json);
+    assert!(
+        round_trip.is_err(),
+        "Deserializing Infinity-as-null back into PropertyValue::Number should fail"
+    );
+}
+
+#[test]
+fn edge_serde_neg_infinity_serializes_as_null() {
+    let json = serde_json::to_string(&PropertyValue::Number(f64::NEG_INFINITY)).unwrap();
+    assert!(json.contains("null"));
+
+    let round_trip = serde_json::from_str::<PropertyValue>(&json);
+    assert!(round_trip.is_err());
 }
 
 // ===========================================================================
