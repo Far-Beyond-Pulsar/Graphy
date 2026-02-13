@@ -33,7 +33,8 @@
 use crate::core::*;
 use crate::GraphyError;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet, VecDeque};
+use rustc_hash::FxHashMap;
+use std::collections::{HashSet, VecDeque};
 
 /// Data source for a node input.
 ///
@@ -66,6 +67,10 @@ pub enum DataSource {
 /// - What variable names to use for node results
 /// - What order to evaluate pure nodes in
 ///
+/// # Performance
+///
+/// Uses `FxHashMap` (faster, non-cryptographic hashing) internally for better performance.
+///
 /// # Thread Safety
 ///
 /// `DataResolver` is not `Send` or `Sync` because it's designed to be created
@@ -73,10 +78,12 @@ pub enum DataSource {
 /// of multiple graphs, create separate resolvers.
 pub struct DataResolver {
     /// Maps (node_id, input_pin) -> DataSource
-    input_sources: HashMap<(String, String), DataSource>,
+    /// Uses FxHashMap for ~2x faster lookups than HashMap
+    input_sources: FxHashMap<(String, String), DataSource>,
 
     /// Maps node_id -> unique variable name for its result
-    result_variables: HashMap<String, String>,
+    /// Uses FxHashMap for ~2x faster lookups than HashMap
+    result_variables: FxHashMap<String, String>,
 
     /// Topologically sorted list of pure node IDs
     pure_evaluation_order: Vec<String>,
@@ -119,10 +126,20 @@ impl DataResolver {
         graph: &GraphDescription,
         metadata_provider: &P,
     ) -> Result<Self, GraphyError> {
+        // Pre-allocate with estimated capacity for better performance
+        let node_count = graph.nodes.len();
+        let connection_count = graph.connections.len();
+        
         let mut resolver = DataResolver {
-            input_sources: HashMap::new(),
-            result_variables: HashMap::new(),
-            pure_evaluation_order: Vec::new(),
+            input_sources: FxHashMap::with_capacity_and_hasher(
+                connection_count * 2, 
+                Default::default()
+            ),
+            result_variables: FxHashMap::with_capacity_and_hasher(
+                node_count, 
+                Default::default()
+            ),
+            pure_evaluation_order: Vec::with_capacity(node_count / 4), // Estimate ~25% pure nodes
         };
 
         // Phase 1: Map all data connections
@@ -183,10 +200,20 @@ impl DataResolver {
         graph: &GraphDescription,
         metadata_provider: &P,
     ) -> Result<Self, GraphyError> {
+        // Pre-allocate with estimated capacity for better performance
+        let node_count = graph.nodes.len();
+        let connection_count = graph.connections.len();
+        
         let mut resolver = DataResolver {
-            input_sources: HashMap::new(),
-            result_variables: HashMap::new(),
-            pure_evaluation_order: Vec::new(),
+            input_sources: FxHashMap::with_capacity_and_hasher(
+                connection_count * 2, 
+                Default::default()
+            ),
+            result_variables: FxHashMap::with_capacity_and_hasher(
+                node_count, 
+                Default::default()
+            ),
+            pure_evaluation_order: Vec::with_capacity(node_count / 4), // Estimate ~25% pure nodes
         };
 
         // Use the pre-warmed thread pool
@@ -315,9 +342,12 @@ impl DataResolver {
         graph: &GraphDescription,
         metadata_provider: &P,
     ) -> Result<(), GraphyError> {
-        // Build dependency graph for pure nodes
-        let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
-        let mut pure_nodes: HashSet<String> = HashSet::new();
+        let node_count = graph.nodes.len();
+        
+        // Build dependency graph for pure nodes with pre-allocated capacity
+        let mut dependencies: FxHashMap<String, Vec<String>> = 
+            FxHashMap::with_capacity_and_hasher(node_count / 2, Default::default());
+        let mut pure_nodes: HashSet<String> = HashSet::with_capacity(node_count / 2);
 
         // Identify pure nodes
         for (node_id, node) in &graph.nodes {
@@ -342,8 +372,9 @@ impl DataResolver {
                 }
         }
 
-        // Build reverse dependency map
-        let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
+        // Build reverse dependency map with pre-allocated capacity
+        let mut dependents: FxHashMap<String, Vec<String>> = 
+            FxHashMap::with_capacity_and_hasher(pure_nodes.len(), Default::default());
         for (target, sources) in &dependencies {
             for source in sources {
                 dependents
@@ -354,7 +385,8 @@ impl DataResolver {
         }
 
         // Topological sort using Kahn's algorithm
-        let mut in_degree: HashMap<String, usize> = HashMap::new();
+        let mut in_degree: FxHashMap<String, usize> = 
+            FxHashMap::with_capacity_and_hasher(pure_nodes.len(), Default::default());
         for node_id in &pure_nodes {
             let num_deps = dependencies.get(node_id).map(|v| v.len()).unwrap_or(0);
             in_degree.insert(node_id.clone(), num_deps);
@@ -483,6 +515,7 @@ fn sanitize_var_name(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     struct TestMetadataProvider {
         metadata: HashMap<String, NodeMetadata>,
