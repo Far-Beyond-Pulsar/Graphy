@@ -81,7 +81,8 @@ impl TypeInfo {
     /// let tuple_type = TypeInfo::new("(f32, f32)");
     /// let custom_type = TypeInfo::new("MyStruct");
     /// ```
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn new(type_string: impl Into<String>) -> Self {
         Self {
             type_string: type_string.into(),
@@ -96,14 +97,14 @@ impl fmt::Display for TypeInfo {
 }
 
 impl From<&str> for TypeInfo {
-    #[inline]
+    #[inline(always)]
     fn from(s: &str) -> Self {
         Self::new(s)
     }
 }
 
 impl From<String> for TypeInfo {
-    #[inline]
+    #[inline(always)]
     fn from(s: String) -> Self {
         Self::new(s)
     }
@@ -198,8 +199,9 @@ impl Position {
     /// assert_eq!(pos.x, 100.0);
     /// assert_eq!(pos.y, 200.0);
     /// ```
-    #[inline]
-    pub fn new(x: f64, y: f64) -> Self {
+    #[inline(always)]
+    #[must_use]
+    pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
 
@@ -214,14 +216,15 @@ impl Position {
     /// assert_eq!(origin.x, 0.0);
     /// assert_eq!(origin.y, 0.0);
     /// ```
-    #[inline]
-    pub fn zero() -> Self {
+    #[inline(always)]
+    #[must_use]
+    pub const fn zero() -> Self {
         Self { x: 0.0, y: 0.0 }
     }
 }
 
 impl Default for Position {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::zero()
     }

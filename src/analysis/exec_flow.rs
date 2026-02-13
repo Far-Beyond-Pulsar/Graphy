@@ -75,7 +75,7 @@ impl ExecutionRouting {
     /// # Performance
     ///
     /// This is an O(1) lookup thanks to hash table storage.
-    #[inline]
+    #[inline(always)]
     pub fn get_connected_nodes(&self, node_id: &str, output_pin: &str) -> &[String] {
         self.routes
             .get(&(node_id.to_string(), output_pin.to_string()))
@@ -84,7 +84,7 @@ impl ExecutionRouting {
     }
 
     /// Checks if a node has any outgoing execution connections.
-    #[inline]
+    #[inline(always)]
     pub fn has_execution_outputs(&self, node_id: &str) -> bool {
         self.routes.keys().any(|(id, _)| id == node_id)
     }

@@ -68,7 +68,8 @@ impl GraphMetadata {
     /// assert_eq!(meta.name, "shader_graph");
     /// assert_eq!(meta.version, "1.0.0");
     /// ```
-    #[inline]
+    #[inline(always)]
+    #[must_use]
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -133,6 +134,7 @@ impl GraphDescription {
     /// assert!(graph.nodes.is_empty());
     /// ```
     #[inline]
+    #[must_use]
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             metadata: GraphMetadata::new(name),
@@ -156,7 +158,7 @@ impl GraphDescription {
     /// graph.add_node(node);
     /// assert!(graph.get_node("node_1").is_some());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn add_node(&mut self, node: NodeInstance) {
         self.nodes.insert(node.id.clone(), node);
     }
@@ -164,7 +166,7 @@ impl GraphDescription {
     /// Adds a connection to the graph.
     ///
     /// Connections are validated during analysis phases, not at insertion time.
-    #[inline]
+    #[inline(always)]
     pub fn add_connection(&mut self, connection: Connection) {
         self.connections.push(connection);
     }
@@ -176,7 +178,7 @@ impl GraphDescription {
     /// # Performance
     ///
     /// This is an O(1) operation thanks to `HashMap` storage.
-    #[inline]
+    #[inline(always)]
     pub fn get_node(&self, id: &str) -> Option<&NodeInstance> {
         self.nodes.get(id)
     }
@@ -188,7 +190,7 @@ impl GraphDescription {
     /// # Performance
     ///
     /// This is an O(1) operation thanks to `HashMap` storage.
-    #[inline]
+    #[inline(always)]
     pub fn get_node_mut(&mut self, id: &str) -> Option<&mut NodeInstance> {
         self.nodes.get_mut(id)
     }

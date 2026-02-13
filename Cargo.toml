@@ -27,9 +27,36 @@ rayon = "1.11"
 # Fast hashing (non-cryptographic)
 rustc-hash = "2.0"
 
+# Stack-allocated vectors for small collections
+smallvec = "1.13"
+
 [dev-dependencies]
 tracing-subscriber = "0.3"
 criterion = { version = "0.5", features = ["html_reports"] }
+
+# ====================
+# PERFORMANCE PROFILES
+# ====================
+
+[profile.release]
+# Maximum optimization level
+opt-level = 3
+
+# Link-Time Optimization - better cross-crate optimization
+lto = "fat"
+
+# Single codegen unit for maximum optimization (slower compile, faster runtime)
+codegen-units = 1
+
+# Abort on panic (smaller binary, slightly faster)
+panic = "abort"
+
+# Strip debug symbols from binary
+strip = true
+
+[profile.bench]
+# Inherit release optimizations for benchmarks
+inherits = "release"
 
 [[bench]]
 name = "graph_benchmarks"

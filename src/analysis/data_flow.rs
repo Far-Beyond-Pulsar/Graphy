@@ -305,21 +305,21 @@ impl DataResolver {
                         let pin_name = &pin_instance.id;
                         let key = (node_id.clone(), pin_name.clone());
                         
-                        if !self.input_sources.contains_key(&key) {
-                            if let Some(prop_value) = node.properties.get(pin_name) {
-                                Some((key, DataSource::Constant(property_value_to_string(prop_value))))
-                            } else {
-                                Some((key, DataSource::Default))
-                            }
+                        if let Some(prop_value) = node.properties.get(pin_name) {
+                            Some((key, DataSource::Constant(property_value_to_string(prop_value))))
                         } else {
-                            None
+                            Some((key, DataSource::Default))
                         }
                     })
                     .collect::<Vec<_>>()
             })
             .collect();
 
-        self.input_sources.extend(default_sources);
+        // Only insert defaults that don't exist
+        for (key, source) in default_sources {
+            self.input_sources.entry(key).or_insert(source);
+        }
+        
         Ok(())
     }
 
@@ -415,10 +415,17 @@ impl DataResolver {
 
         // Check for cycles
         if self.pure_evaluation_order.len() != pure_nodes.len() {
-            return Err(GraphyError::CyclicDependency);
+            return Self::cycle_error();
         }
 
         Ok(())
+    }
+
+    /// Helper for cyclic dependency error (cold path)
+    #[cold]
+    #[inline(never)]
+    fn cycle_error() -> Result<(), GraphyError> {
+        Err(GraphyError::CyclicDependency)
     }
 
     /// Retrieves the data source for a specific node input.
@@ -445,10 +452,9 @@ impl DataResolver {
     ///     }
     /// }
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_input_source(&self, node_id: &str, pin_name: &str) -> Option<&DataSource> {
-        self.input_sources
-            .get(&(node_id.to_string(), pin_name.to_string()))
+        self.input_sources.get(&(node_id.to_string(), pin_name.to_string()))
     }
 
     /// Retrieves the generated variable name for a node's result.
@@ -462,7 +468,7 @@ impl DataResolver {
     ///     println!("let {} = add(a, b);", var_name);
     /// }
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_result_variable(&self, node_id: &str) -> Option<&String> {
         self.result_variables.get(node_id)
     }
@@ -480,7 +486,7 @@ impl DataResolver {
     ///     println!("Evaluate node: {}", node_id);
     /// }
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_pure_evaluation_order(&self) -> &[String] {
         &self.pure_evaluation_order
     }
