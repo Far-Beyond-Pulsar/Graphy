@@ -96,11 +96,11 @@ fn serde_property_string() {
 
 #[test]
 fn serde_property_number() {
-    let pv = PropertyValue::Number(3.14);
+    let pv = PropertyValue::Number(3.1415926);
     let json = serde_json::to_string(&pv).unwrap();
     let deserialized: PropertyValue = serde_json::from_str(&json).unwrap();
     match deserialized {
-        PropertyValue::Number(n) => assert!((n - 3.14).abs() < f64::EPSILON),
+        PropertyValue::Number(n) => assert!((n - 3.1415926).abs() < f64::EPSILON),
         _ => panic!("wrong variant"),
     }
 }

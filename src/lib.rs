@@ -72,7 +72,7 @@ pub mod parallel;
 // Re-export commonly used types
 pub use core::{
     GraphDescription, NodeInstance, Connection, Pin, PinInstance,
-    DataType, NodeTypes, Position, ConnectionType, PropertyValue,
+    DataType, TypeInfo, NodeTypes, Position, ConnectionType, PropertyValue,
     GraphMetadata, NodeMetadata, ParamInfo, NodeMetadataProvider, PinType,
 };
 
