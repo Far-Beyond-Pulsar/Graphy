@@ -32,6 +32,7 @@
 
 use crate::core::*;
 use crate::GraphyError;
+use crate::{compiler_debug, compiler_error, compiler_info};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use std::collections::{HashSet, VecDeque};
@@ -126,6 +127,15 @@ impl DataResolver {
         graph: &GraphDescription,
         metadata_provider: &P,
     ) -> Result<Self, GraphyError> {
+        compiler_info(
+            "data_flow",
+            format!(
+                "Starting sequential data-flow analysis: {} nodes, {} connections",
+                graph.nodes.len(),
+                graph.connections.len()
+            ),
+        );
+
         // Pre-allocate with estimated capacity for better performance
         let node_count = graph.nodes.len();
         let connection_count = graph.connections.len();
@@ -144,12 +154,24 @@ impl DataResolver {
 
         // Phase 1: Map all data connections
         resolver.map_data_connections(graph)?;
+        compiler_debug("data_flow", "Mapped data connections");
 
         // Phase 2: Generate variable names for node results
         resolver.generate_variable_names(graph);
+        compiler_debug(
+            "data_flow",
+            format!("Generated {} result variable names", resolver.result_variables.len()),
+        );
 
         // Phase 3: Determine evaluation order for pure nodes
         resolver.compute_pure_evaluation_order(graph, metadata_provider)?;
+        compiler_info(
+            "data_flow",
+            format!(
+                "Resolved pure-node evaluation order: {} nodes",
+                resolver.pure_evaluation_order.len()
+            ),
+        );
 
         Ok(resolver)
     }
@@ -200,6 +222,15 @@ impl DataResolver {
         graph: &GraphDescription,
         metadata_provider: &P,
     ) -> Result<Self, GraphyError> {
+        compiler_info(
+            "data_flow",
+            format!(
+                "Starting parallel data-flow analysis: {} nodes, {} connections",
+                graph.nodes.len(),
+                graph.connections.len()
+            ),
+        );
+
         // Pre-allocate with estimated capacity for better performance
         let node_count = graph.nodes.len();
         let connection_count = graph.connections.len();
@@ -231,12 +262,21 @@ impl DataResolver {
 
         // Phase 3: Determine evaluation order for pure nodes (sequential)
         resolver.compute_pure_evaluation_order(graph, metadata_provider)?;
+        compiler_info(
+            "data_flow",
+            format!(
+                "Resolved pure-node evaluation order (parallel pipeline): {} nodes",
+                resolver.pure_evaluation_order.len()
+            ),
+        );
 
         Ok(resolver)
     }
 
     /// Map all data connections in the graph
     fn map_data_connections(&mut self, graph: &GraphDescription) -> Result<(), GraphyError> {
+        let mut mapped_connections = 0usize;
+
         for connection in &graph.connections {
             if matches!(connection.connection_type, ConnectionType::Data) {
                 let key = (connection.target_node.clone(), connection.target_pin.clone());
@@ -246,6 +286,7 @@ impl DataResolver {
                 };
 
                 self.input_sources.insert(key, source);
+                mapped_connections += 1;
             }
         }
 
@@ -265,6 +306,15 @@ impl DataResolver {
                 });
             }
         }
+
+        compiler_debug(
+            "data_flow",
+            format!(
+                "Mapped {} data connections and {} resolved input sources",
+                mapped_connections,
+                self.input_sources.len()
+            ),
+        );
 
         Ok(())
     }
@@ -415,7 +465,21 @@ impl DataResolver {
 
         // Check for cycles
         if self.pure_evaluation_order.len() != pure_nodes.len() {
-            return Self::cycle_error();
+            let unresolved: Vec<String> = pure_nodes
+                .iter()
+                .filter(|node_id| !self.pure_evaluation_order.contains(node_id))
+                .cloned()
+                .collect();
+
+            compiler_error(
+                "data_flow",
+                format!(
+                    "Cyclic dependency detected among pure nodes. Unresolved nodes: {:?}",
+                    unresolved
+                ),
+            );
+
+            return Self::cycle_error(unresolved);
         }
 
         Ok(())
@@ -424,8 +488,15 @@ impl DataResolver {
     /// Helper for cyclic dependency error (cold path)
     #[cold]
     #[inline(never)]
-    fn cycle_error() -> Result<(), GraphyError> {
-        Err(GraphyError::CyclicDependency)
+    fn cycle_error(unresolved_nodes: Vec<String>) -> Result<(), GraphyError> {
+        if unresolved_nodes.is_empty() {
+            return Err(GraphyError::CyclicDependency);
+        }
+
+        Err(GraphyError::Custom(format!(
+            "Cyclic dependency detected in pure-node data flow. Unresolved nodes: {}",
+            unresolved_nodes.join(", ")
+        )))
     }
 
     /// Retrieves the data source for a specific node input.

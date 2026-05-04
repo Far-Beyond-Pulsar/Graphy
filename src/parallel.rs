@@ -5,6 +5,7 @@
 
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::OnceLock;
+use crate::{compiler_debug, compiler_info};
 
 /// Global thread pool for graph analysis
 static GRAPH_POOL: OnceLock<ThreadPool> = OnceLock::new();
@@ -91,11 +92,12 @@ impl ThreadPoolConfig {
 pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
     let num_threads = config.get_num_threads();
     
-    tracing::info!(
-        "[THREADPOOL] Initializing with {} threads (stack: {:?}, breadth_first: {})",
-        num_threads,
-        config.stack_size,
-        config.breadth_first
+    compiler_info(
+        "threadpool",
+        format!(
+            "Initializing with {} threads (stack: {:?}, breadth_first: {})",
+            num_threads, config.stack_size, config.breadth_first
+        ),
     );
     
     let mut builder = ThreadPoolBuilder::new()
@@ -124,7 +126,7 @@ pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
         });
     });
     
-    tracing::info!("[THREADPOOL] Thread pool warmed up and ready");
+    compiler_info("threadpool", "Thread pool warmed up and ready");
     
     GRAPH_POOL.set(pool).map_err(|_| "Thread pool already initialized".to_string())?;
     
@@ -136,7 +138,7 @@ pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
 /// If the pool hasn't been initialized, creates one with default settings.
 pub fn get_thread_pool() -> &'static ThreadPool {
     GRAPH_POOL.get_or_init(|| {
-        tracing::debug!("[THREADPOOL] Lazy initializing with defaults");
+        compiler_debug("threadpool", "Lazy initializing with defaults");
         
         let config = ThreadPoolConfig::default();
         let num_threads = config.get_num_threads();

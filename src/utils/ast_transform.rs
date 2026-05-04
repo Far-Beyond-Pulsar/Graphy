@@ -9,6 +9,7 @@
 //! - Inlining control flow nodes
 
 use crate::GraphyError;
+use crate::{compiler_debug, compiler_info};
 use std::collections::HashMap;
 use syn::{
     visit::{self, Visit},
@@ -34,9 +35,12 @@ pub fn inline_control_flow_function(
     exec_replacements: HashMap<String, String>,
     param_substitutions: HashMap<String, String>,
 ) -> Result<String, GraphyError> {
-    tracing::info!("[AST] Inlining control flow function");
-    tracing::info!("[AST] Exec replacements: {:?}", exec_replacements);
-    tracing::info!("[AST] Param substitutions: {:?}", param_substitutions);
+    compiler_info("ast", "Inlining control flow function");
+    compiler_debug("ast", format!("Exec replacements: {:?}", exec_replacements));
+    compiler_debug(
+        "ast",
+        format!("Param substitutions: {:?}", param_substitutions),
+    );
 
     // Parse the function
     let item_fn = parse_function(function_source)?;
@@ -106,10 +110,12 @@ impl VisitMut for ExecOutputReplacer {
                         let label_value = label.value();
 
                         if let Some(replacement_code) = self.replacements.get(&label_value) {
-                            tracing::info!(
-                                "[AST] Replacing exec_output!(\"{}\") with: {}",
-                                label_value,
-                                replacement_code
+                            compiler_info(
+                                "ast",
+                                format!(
+                                    "Replacing exec_output!(\"{}\") with: {}",
+                                    label_value, replacement_code
+                                ),
                             );
 
                             // Parse replacement code and substitute
@@ -138,10 +144,12 @@ impl VisitMut for ExecOutputReplacer {
                     let label_value = label.value();
 
                     if let Some(replacement_code) = self.replacements.get(&label_value) {
-                        tracing::info!(
-                            "[AST] Replacing exec_output!(\"{}\") expr with: {}",
-                            label_value,
-                            replacement_code
+                        compiler_info(
+                            "ast",
+                            format!(
+                                "Replacing exec_output!(\"{}\") expr with: {}",
+                                label_value, replacement_code
+                            ),
                         );
 
                         match syn::parse_str::<Expr>(replacement_code) {
@@ -195,7 +203,10 @@ impl VisitMut for ParameterSubstitutor {
                 let ident_str = ident.to_string();
 
                 if let Some(replacement) = self.substitutions.get(&ident_str) {
-                    tracing::info!("[AST] Substituting {} with {}", ident_str, replacement);
+                    compiler_info(
+                        "ast",
+                        format!("Substituting {} with {}", ident_str, replacement),
+                    );
 
                     if let Ok(replacement_expr) = syn::parse_str::<Expr>(replacement) {
                         *expr = replacement_expr;
@@ -216,7 +227,10 @@ pub fn extract_exec_output_labels(function_source: &str) -> Result<Vec<String>, 
     let mut extractor = ExecOutputLabelExtractor { labels: Vec::new() };
     extractor.visit_item_fn(&item_fn);
     
-    tracing::debug!("[AST] Extracted {} exec_output labels", extractor.labels.len());
+    compiler_debug(
+        "ast",
+        format!("Extracted {} exec_output labels", extractor.labels.len()),
+    );
     
     Ok(extractor.labels)
 }

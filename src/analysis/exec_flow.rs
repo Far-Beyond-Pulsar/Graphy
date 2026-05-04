@@ -11,6 +11,7 @@
 //! Uses `FxHashMap` for faster routing table lookups.
 
 use crate::core::{GraphDescription, ConnectionType};
+use crate::compiler_info;
 use rustc_hash::FxHashMap;
 
 /// Execution routing table.
@@ -60,9 +61,15 @@ impl ExecutionRouting {
             }
         }
 
-        tracing::info!("[ROUTING] Built execution routing table with {} routes", routes.len());
+        compiler_info(
+            "routing",
+            format!("Built execution routing table with {} routes", routes.len()),
+        );
         for ((node_id, pin_name), targets) in &routes {
-            tracing::info!("[ROUTING]   ({}, {}) -> {:?}", node_id, pin_name, targets);
+            compiler_info(
+                "routing",
+                format!("({}, {}) -> {:?}", node_id, pin_name, targets),
+            );
         }
 
         ExecutionRouting { routes }

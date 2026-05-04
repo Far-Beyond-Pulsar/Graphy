@@ -68,6 +68,7 @@ pub mod analysis;
 pub mod generation;
 pub mod utils;
 pub mod parallel;
+pub mod logging;
 
 // Re-export commonly used types
 pub use core::{
@@ -82,6 +83,19 @@ pub use analysis::{
 
 pub use generation::{
     CodeGeneratorContext,
+};
+
+pub use logging::{
+    compiler_debug,
+    compiler_error,
+    compiler_info,
+    compiler_trace,
+    compiler_warn,
+    subscribe_compiler_logs,
+    unsubscribe_compiler_logs,
+    CompilerLogLevel,
+    CompilerLogLine,
+    CompilerLogSubscription,
 };
 
 pub use utils::{
@@ -120,4 +134,29 @@ pub enum GraphyError {
 
     #[error("{0}")]
     Custom(String),
+}
+
+impl GraphyError {
+    /// Human-friendly error detail suitable for compiler output panes.
+    pub fn detailed_message(&self) -> String {
+        match self {
+            Self::NodeNotFound(node) => {
+                format!("Node '{}' was referenced but is missing from the graph.", node)
+            }
+            Self::PinNotFound { node, pin } => {
+                format!("Pin '{}.{}' was referenced but could not be resolved.", node, pin)
+            }
+            Self::TypeMismatch { expected, actual } => {
+                format!("Type mismatch while compiling graph: expected '{}', got '{}'.", expected, actual)
+            }
+            Self::CyclicDependency => {
+                "Cyclic dependency detected in pure-node evaluation order. Break data loops or introduce stateful nodes.".to_string()
+            }
+            Self::InvalidConnection(message) => format!("Invalid connection: {}", message),
+            Self::CodeGeneration(message) => format!("Code generation failed: {}", message),
+            Self::AstParsing(message) => format!("AST parsing failed: {}", message),
+            Self::GraphExpansion(message) => format!("Graph expansion failed: {}", message),
+            Self::Custom(message) => message.clone(),
+        }
+    }
 }
