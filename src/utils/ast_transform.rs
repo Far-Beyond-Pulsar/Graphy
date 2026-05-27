@@ -109,24 +109,54 @@ impl VisitMut for ExecOutputReplacer {
                     if let Ok(label) = syn::parse2::<syn::LitStr>(stmt_macro.mac.tokens.clone()) {
                         let label_value = label.value();
 
-                        if let Some(replacement_code) = self.replacements.get(&label_value) {
-                            compiler_info(
-                                "ast",
-                                format!(
-                                    "Replacing exec_output!(\"{}\") with: {}",
-                                    label_value, replacement_code
-                                ),
-                            );
+                        // Helper closure: produce an empty `{}` statement.
+                        let empty_block = || {
+                            Stmt::Expr(
+                                Expr::Block(syn::ExprBlock {
+                                    attrs: vec![],
+                                    label: None,
+                                    block: syn::Block {
+                                        brace_token: Default::default(),
+                                        stmts: vec![],
+                                    },
+                                }),
+                                None,
+                            )
+                        };
 
-                            // Parse replacement code and substitute
-                            if let Ok(parsed_stmts) =
-                                syn::parse_str::<syn::File>(&format!("fn dummy() {{{}}}", replacement_code))
-                            {
-                                if let Some(syn::Item::Fn(item_fn)) = parsed_stmts.items.first() {
-                                    if let Some(first_stmt) = item_fn.block.stmts.first() {
-                                        *stmt = first_stmt.clone();
-                                    }
+                        match self.replacements.get(&label_value) {
+                            Some(replacement_code) if !replacement_code.is_empty() => {
+                                compiler_info(
+                                    "ast",
+                                    format!(
+                                        "Replacing exec_output!(\"{}\") with: {}",
+                                        label_value, replacement_code
+                                    ),
+                                );
+
+                                // Replace with a BLOCK containing ALL replacement statements.
+                                // Using a block (not just the first stmt) preserves every
+                                // node in a multi-node chain that follows a Sequence output.
+                                if let Ok(block) = syn::parse_str::<Block>(
+                                    &format!("{{{}}}", replacement_code),
+                                ) {
+                                    *stmt = Stmt::Expr(
+                                        Expr::Block(syn::ExprBlock {
+                                            attrs: vec![],
+                                            label: None,
+                                            block,
+                                        }),
+                                        None,
+                                    );
+                                } else {
+                                    // Fallback: erase rather than leaving exec_output!() bare.
+                                    *stmt = empty_block();
                                 }
+                            }
+                            _ => {
+                                // No replacement registered, or empty replacement:
+                                // erase the macro so Rust never sees `exec_output!`.
+                                *stmt = empty_block();
                             }
                         }
                     }
@@ -143,34 +173,46 @@ impl VisitMut for ExecOutputReplacer {
                 if let Ok(label) = syn::parse2::<syn::LitStr>(mac.tokens.clone()) {
                     let label_value = label.value();
 
-                    if let Some(replacement_code) = self.replacements.get(&label_value) {
-                        compiler_info(
-                            "ast",
-                            format!(
-                                "Replacing exec_output!(\"{}\") expr with: {}",
-                                label_value, replacement_code
-                            ),
-                        );
+                    let empty_block_expr = || Expr::Block(syn::ExprBlock {
+                        attrs: vec![],
+                        label: None,
+                        block: syn::Block {
+                            brace_token: Default::default(),
+                            stmts: vec![],
+                        },
+                    });
 
-                        match syn::parse_str::<Expr>(replacement_code) {
-                            Ok(replacement_expr) => {
+                    match self.replacements.get(&label_value) {
+                        Some(replacement_code) if !replacement_code.is_empty() => {
+                            compiler_info(
+                                "ast",
+                                format!(
+                                    "Replacing exec_output!(\"{}\") expr with: {}",
+                                    label_value, replacement_code
+                                ),
+                            );
+
+                            // Try as a single expression first, then fall back to a block.
+                            if let Ok(replacement_expr) = syn::parse_str::<Expr>(replacement_code) {
                                 *expr = replacement_expr;
-                                return;
-                            }
-                            Err(_) => {
-                                if let Ok(block) =
-                                    syn::parse_str::<Block>(&format!("{{{}}}", replacement_code))
-                                {
-                                    *expr = Expr::Block(syn::ExprBlock {
-                                        attrs: vec![],
-                                        label: None,
-                                        block,
-                                    });
-                                    return;
-                                }
+                            } else if let Ok(block) =
+                                syn::parse_str::<Block>(&format!("{{{}}}", replacement_code))
+                            {
+                                *expr = Expr::Block(syn::ExprBlock {
+                                    attrs: vec![],
+                                    label: None,
+                                    block,
+                                });
+                            } else {
+                                *expr = empty_block_expr();
                             }
                         }
+                        _ => {
+                            // No replacement or empty: erase rather than leave exec_output! bare.
+                            *expr = empty_block_expr();
+                        }
                     }
+                    return;
                 }
             }
         }
