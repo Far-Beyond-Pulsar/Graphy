@@ -1,4 +1,4 @@
-//! Tests for core type system: DataType, TypeInfo, NodeTypes, PropertyValue, Position.
+//! Tests for core type system: DataType, TypeInfo, NodeTypes, JsonValue, Position.
 
 use graphy::*;
 
@@ -138,87 +138,50 @@ fn nodetypes_copy() {
 }
 
 // ===========================================================================
-// PropertyValue
+// JsonValue
 // ===========================================================================
 
 #[test]
 fn property_value_string() {
-    let pv = PropertyValue::String("hello".to_string());
-    match &pv {
-        PropertyValue::String(s) => assert_eq!(s, "hello"),
-        _ => panic!("expected String variant"),
-    }
+    let pv: JsonValue = serde_json::json!("hello");
+    assert_eq!(pv, serde_json::json!("hello"));
 }
 
 #[test]
 fn property_value_number() {
-    let pv = PropertyValue::Number(42.0);
-    match &pv {
-        PropertyValue::Number(n) => assert_eq!(*n, 42.0),
-        _ => panic!("expected Number variant"),
-    }
+    let pv: JsonValue = serde_json::json!(42.0);
+    assert_eq!(pv, serde_json::json!(42.0));
 }
 
 #[test]
 fn property_value_boolean() {
-    let pv = PropertyValue::Boolean(true);
-    match &pv {
-        PropertyValue::Boolean(b) => assert!(*b),
-        _ => panic!("expected Boolean variant"),
-    }
+    let pv: JsonValue = serde_json::json!(true);
+    assert_eq!(pv, serde_json::json!(true));
 }
 
 #[test]
 fn property_value_vector2() {
-    let pv = PropertyValue::Vector2(1.0, 2.0);
-    match &pv {
-        PropertyValue::Vector2(x, y) => {
-            assert_eq!(*x, 1.0);
-            assert_eq!(*y, 2.0);
-        }
-        _ => panic!("expected Vector2 variant"),
-    }
+    let pv: JsonValue = serde_json::json!([1.0, 2.0]);
+    assert_eq!(pv, serde_json::json!([1.0, 2.0]));
 }
 
 #[test]
 fn property_value_vector3() {
-    let pv = PropertyValue::Vector3(1.0, 2.0, 3.0);
-    match &pv {
-        PropertyValue::Vector3(x, y, z) => {
-            assert_eq!(*x, 1.0);
-            assert_eq!(*y, 2.0);
-            assert_eq!(*z, 3.0);
-        }
-        _ => panic!("expected Vector3 variant"),
-    }
+    let pv: JsonValue = serde_json::json!([1.0, 2.0, 3.0]);
+    assert_eq!(pv, serde_json::json!([1.0, 2.0, 3.0]));
 }
 
 #[test]
 fn property_value_color() {
-    let pv = PropertyValue::Color(1.0, 0.5, 0.0, 1.0);
-    match &pv {
-        PropertyValue::Color(r, g, b, a) => {
-            assert_eq!(*r, 1.0);
-            assert_eq!(*g, 0.5);
-            assert_eq!(*b, 0.0);
-            assert_eq!(*a, 1.0);
-        }
-        _ => panic!("expected Color variant"),
-    }
+    let pv: JsonValue = serde_json::json!([1.0, 0.5, 0.0, 1.0]);
+    assert_eq!(pv, serde_json::json!([1.0, 0.5, 0.0, 1.0]));
 }
 
 #[test]
 fn property_value_clone() {
-    let original = PropertyValue::Vector3(1.0, 2.0, 3.0);
+    let original: JsonValue = serde_json::json!([1.0, 2.0, 3.0]);
     let cloned = original.clone();
-    match (&original, &cloned) {
-        (PropertyValue::Vector3(x1, y1, z1), PropertyValue::Vector3(x2, y2, z2)) => {
-            assert_eq!(x1, x2);
-            assert_eq!(y1, y2);
-            assert_eq!(z1, z2);
-        }
-        _ => panic!("clone didn't preserve variant"),
-    }
+    assert_eq!(original, cloned);
 }
 
 // ===========================================================================
