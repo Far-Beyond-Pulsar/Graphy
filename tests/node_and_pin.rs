@@ -158,14 +158,11 @@ fn node_mixed_pins() {
 #[test]
 fn node_set_and_get_property() {
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.set_property("value", PropertyValue::Number(42.0));
+    node.set_property("value", 42.0);
 
     let prop = node.get_property("value");
     assert!(prop.is_some());
-    match prop.unwrap() {
-        PropertyValue::Number(n) => assert_eq!(*n, 42.0),
-        _ => panic!("expected Number"),
-    }
+    assert_eq!(prop.unwrap(), &serde_json::json!(42.0));
 }
 
 #[test]
@@ -177,24 +174,21 @@ fn node_get_nonexistent_property_returns_none() {
 #[test]
 fn node_set_property_overwrites() {
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.set_property("x", PropertyValue::Number(1.0));
-    node.set_property("x", PropertyValue::Number(2.0));
+    node.set_property("x", 1.0);
+    node.set_property("x", 2.0);
 
-    match node.get_property("x").unwrap() {
-        PropertyValue::Number(n) => assert_eq!(*n, 2.0),
-        _ => panic!("expected Number"),
-    }
+    assert_eq!(node.get_property("x").unwrap(), &serde_json::json!(2.0));
 }
 
 #[test]
 fn node_multiple_property_types() {
     let mut node = NodeInstance::new("n", "complex", Position::zero());
-    node.set_property("name", PropertyValue::String("foo".into()));
-    node.set_property("count", PropertyValue::Number(10.0));
-    node.set_property("enabled", PropertyValue::Boolean(true));
-    node.set_property("pos", PropertyValue::Vector2(1.0, 2.0));
-    node.set_property("dir", PropertyValue::Vector3(0.0, 1.0, 0.0));
-    node.set_property("tint", PropertyValue::Color(1.0, 0.0, 0.0, 1.0));
+    node.set_property("name", "foo");
+    node.set_property("count", 10.0);
+    node.set_property("enabled", true);
+    node.set_property("pos", serde_json::json!([1.0, 2.0]));
+    node.set_property("dir", serde_json::json!([0.0, 1.0, 0.0]));
+    node.set_property("tint", serde_json::json!([1.0, 0.0, 0.0, 1.0]));
 
     assert_eq!(node.properties.len(), 6);
 }
@@ -208,7 +202,7 @@ fn node_clone_preserves_all_data() {
     let mut node = NodeInstance::new("original", "add", Position::new(5.0, 10.0));
     node.add_input_pin("a", DataType::Typed("i64".into()));
     node.add_output_pin("result", DataType::Typed("i64".into()));
-    node.set_property("a", PropertyValue::Number(7.0));
+    node.set_property("a", 7.0);
 
     let cloned = node.clone();
     assert_eq!(cloned.id, "original");

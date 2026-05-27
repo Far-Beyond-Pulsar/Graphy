@@ -2,13 +2,13 @@
 //!
 //! Data types and type information for node pins and values.
 //!
-//! The type system supports both legacy enum-based types (Number, String, etc.)
+//! The type system supports both legacy enum-based pin types (Number, String, etc.)
 //! and modern typed pins using Rust type strings for maximum flexibility.
 //!
 //! # Example
 //!
 //! ```
-//! use graphy::{DataType, TypeInfo, PropertyValue, Position};
+//! use graphy::{DataType, JsonValue, TypeInfo, Position};
 //!
 //! // Modern typed pin
 //! let typed = DataType::Typed(TypeInfo::new("f64"));
@@ -16,12 +16,13 @@
 //! // Legacy type
 //! let legacy = DataType::Number;
 //!
-//! // Property value
-//! let value = PropertyValue::Number(42.0);
+//! // Property values are stored as dynamic JSON
+//! let value: JsonValue = serde_json::json!(42.0);
 //! ```
 //! ```
 
 use serde::{Deserialize, Serialize};
+pub type JsonValue = serde_json::Value;
 use std::fmt;
 
 /// Data type for a pin.
@@ -147,31 +148,6 @@ pub enum NodeTypes {
     /// Example: OnStart, OnUpdate, OnButtonClick
     #[serde(rename = "event")]
     event,
-}
-
-/// Property value types for node configuration.
-///
-/// Properties are constant values stored directly on nodes,
-/// typically used for defaults or configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PropertyValue {
-    /// String value
-    String(String),
-    
-    /// Numeric value (stored as f64 for flexibility)
-    Number(f64),
-    
-    /// Boolean flag
-    Boolean(bool),
-    
-    /// 2D vector (x, y)
-    Vector2(f64, f64),
-    
-    /// 3D vector (x, y, z)
-    Vector3(f64, f64, f64),
-    
-    /// RGBA color (r, g, b, a) with values in [0, 1]
-    Color(f64, f64, f64, f64),
 }
 
 /// 2D position in visual editor space.

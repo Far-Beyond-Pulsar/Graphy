@@ -180,7 +180,7 @@ pub fn build_linear_chain(n: usize, provider: &TestMetadataProvider) -> GraphDes
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_input_pin("b", DataType::Typed("i64".into()));
         node.add_output_pin("result", DataType::Typed("i64".into()));
-        node.set_property("b", PropertyValue::Number(1.0));
+        node.set_property("b", 1.0);
         graph.add_node(node);
     }
 
@@ -217,8 +217,8 @@ pub fn build_diamond_graph() -> GraphDescription {
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_input_pin("b", DataType::Typed("i64".into()));
         node.add_output_pin("result", DataType::Typed("i64".into()));
-        node.set_property("a", PropertyValue::Number(1.0));
-        node.set_property("b", PropertyValue::Number(2.0));
+        node.set_property("a", 1.0);
+        node.set_property("b", 2.0);
         graph.add_node(node);
     }
 
@@ -243,7 +243,7 @@ pub fn build_exec_chain(n: usize) -> GraphDescription {
         node.add_input_pin("exec_in", DataType::Execution);
         node.add_input_pin("message", DataType::Typed("String".into()));
         node.add_output_pin("exec_out", DataType::Execution);
-        node.set_property("message", PropertyValue::String(format!("step {}", i)));
+        node.set_property("message", format!("step {}", i));
         graph.add_node(node);
     }
 
@@ -274,7 +274,7 @@ pub fn build_branch_graph() -> GraphDescription {
     branch.add_input_pin("condition", DataType::Typed("bool".into()));
     branch.add_output_pin("True", DataType::Execution);
     branch.add_output_pin("False", DataType::Execution);
-    branch.set_property("condition", PropertyValue::Boolean(true));
+    branch.set_property("condition", true);
     graph.add_node(branch);
 
     // True-side print
@@ -282,7 +282,7 @@ pub fn build_branch_graph() -> GraphDescription {
     print_true.add_input_pin("exec_in", DataType::Execution);
     print_true.add_input_pin("message", DataType::Typed("String".into()));
     print_true.add_output_pin("exec_out", DataType::Execution);
-    print_true.set_property("message", PropertyValue::String("true branch".into()));
+    print_true.set_property("message", "true branch");
     graph.add_node(print_true);
 
     // False-side print
@@ -290,7 +290,7 @@ pub fn build_branch_graph() -> GraphDescription {
     print_false.add_input_pin("exec_in", DataType::Execution);
     print_false.add_input_pin("message", DataType::Typed("String".into()));
     print_false.add_output_pin("exec_out", DataType::Execution);
-    print_false.set_property("message", PropertyValue::String("false branch".into()));
+    print_false.set_property("message", "false branch");
     graph.add_node(print_false);
 
     // Connections

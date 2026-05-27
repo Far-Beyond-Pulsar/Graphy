@@ -4,7 +4,7 @@
 
 use graphy::{
     GraphDescription, NodeInstance, Connection, Pin, PinInstance, PinType,
-    DataType, NodeTypes, PropertyValue, ConnectionType, Position,
+    DataType, NodeTypes, ConnectionType, Position,
     DataResolver, ExecutionRouting, NodeMetadata, ParamInfo, NodeMetadataProvider,
 };
 use std::collections::HashMap;
@@ -90,8 +90,8 @@ fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
 
             // Edge nodes have constants
             if col == 0 || row == 0 {
-                node.properties.insert("a".to_string(), PropertyValue::Number((row + col) as f64));
-                node.properties.insert("b".to_string(), PropertyValue::Number(1.0));
+                node.properties.insert("a".to_string(), serde_json::json!((row + col) as f64));
+                node.properties.insert("b".to_string(), serde_json::json!(1.0));
             }
 
             graph.add_node(node);

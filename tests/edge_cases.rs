@@ -34,8 +34,8 @@ fn edge_single_node_no_connections() {
     node.add_input_pin("a", DataType::Typed("i64".into()));
     node.add_input_pin("b", DataType::Typed("i64".into()));
     node.add_output_pin("result", DataType::Typed("i64".into()));
-    node.set_property("a", PropertyValue::Number(1.0));
-    node.set_property("b", PropertyValue::Number(2.0));
+    node.set_property("a", 1.0);
+    node.set_property("b", 2.0);
     graph.add_node(node);
 
     let resolver = DataResolver::build(&graph, &provider).unwrap();
@@ -53,7 +53,7 @@ fn edge_special_chars_in_node_id() {
 
     let mut node = NodeInstance::new("node-with.special@chars!", "add", Position::zero());
     node.add_input_pin("a", DataType::Typed("i64".into()));
-    node.set_property("a", PropertyValue::Number(1.0));
+    node.set_property("a", 1.0);
     graph.add_node(node);
 
     let provider = TestMetadataProvider::empty();
@@ -103,15 +103,15 @@ fn edge_disconnected_subgraphs() {
     a.add_input_pin("a", DataType::Typed("i64".into()));
     a.add_input_pin("b", DataType::Typed("i64".into()));
     a.add_output_pin("result", DataType::Typed("i64".into()));
-    a.set_property("a", PropertyValue::Number(1.0));
-    a.set_property("b", PropertyValue::Number(2.0));
+    a.set_property("a", 1.0);
+    a.set_property("b", 2.0);
     graph.add_node(a);
 
     let mut b = NodeInstance::new("b", "add", Position::zero());
     b.add_input_pin("a", DataType::Typed("i64".into()));
     b.add_input_pin("b", DataType::Typed("i64".into()));
     b.add_output_pin("result", DataType::Typed("i64".into()));
-    b.set_property("b", PropertyValue::Number(3.0));
+    b.set_property("b", 3.0);
     graph.add_node(b);
 
     graph.add_connection(Connection::data("a", "result", "b", "a"));
@@ -121,15 +121,15 @@ fn edge_disconnected_subgraphs() {
     c.add_input_pin("a", DataType::Typed("i64".into()));
     c.add_input_pin("b", DataType::Typed("i64".into()));
     c.add_output_pin("result", DataType::Typed("i64".into()));
-    c.set_property("a", PropertyValue::Number(4.0));
-    c.set_property("b", PropertyValue::Number(5.0));
+    c.set_property("a", 4.0);
+    c.set_property("b", 5.0);
     graph.add_node(c);
 
     let mut d = NodeInstance::new("d", "multiply", Position::new(700.0, 0.0));
     d.add_input_pin("a", DataType::Typed("i64".into()));
     d.add_input_pin("b", DataType::Typed("i64".into()));
     d.add_output_pin("result", DataType::Typed("i64".into()));
-    d.set_property("b", PropertyValue::Number(6.0));
+    d.set_property("b", 6.0);
     graph.add_node(d);
 
     graph.add_connection(Connection::data("c", "result", "d", "a"));
@@ -167,8 +167,8 @@ fn edge_large_wide_graph() {
     source.add_input_pin("a", DataType::Typed("i64".into()));
     source.add_input_pin("b", DataType::Typed("i64".into()));
     source.add_output_pin("result", DataType::Typed("i64".into()));
-    source.set_property("a", PropertyValue::Number(1.0));
-    source.set_property("b", PropertyValue::Number(1.0));
+    source.set_property("a", 1.0);
+    source.set_property("b", 1.0);
     graph.add_node(source);
 
     for i in 0..100 {
@@ -176,7 +176,7 @@ fn edge_large_wide_graph() {
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_input_pin("b", DataType::Typed("i64".into()));
         node.add_output_pin("result", DataType::Typed("i64".into()));
-        node.set_property("b", PropertyValue::Number(i as f64));
+        node.set_property("b", i as f64);
         graph.add_node(node);
 
         graph.add_connection(Connection::data("source", "result", format!("fan_{}", i), "a"));
@@ -215,7 +215,7 @@ fn edge_node_type_not_in_provider() {
 
     let mut node = NodeInstance::new("unknown_1", "unknown_type", Position::zero());
     node.add_input_pin("x", DataType::Typed("i64".into()));
-    node.set_property("x", PropertyValue::Number(42.0));
+    node.set_property("x", 42.0);
     graph.add_node(node);
 
     // Provider doesn't know "unknown_type", but build should still succeed
@@ -293,11 +293,11 @@ fn edge_data_only_graph() {
 #[test]
 fn edge_property_extreme_numbers() {
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.set_property("max", PropertyValue::Number(f64::MAX));
-    node.set_property("min", PropertyValue::Number(f64::MIN));
-    node.set_property("zero", PropertyValue::Number(0.0));
-    node.set_property("neg_zero", PropertyValue::Number(-0.0));
-    node.set_property("tiny", PropertyValue::Number(f64::MIN_POSITIVE));
+    node.set_property("max", f64::MAX);
+    node.set_property("min", f64::MIN);
+    node.set_property("zero", 0.0);
+    node.set_property("neg_zero", -0.0);
+    node.set_property("tiny", f64::MIN_POSITIVE);
 
     assert!(node.get_property("max").is_some());
     assert!(node.get_property("min").is_some());
@@ -306,9 +306,9 @@ fn edge_property_extreme_numbers() {
 #[test]
 fn edge_property_nan_and_infinity() {
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.set_property("nan", PropertyValue::Number(f64::NAN));
-    node.set_property("inf", PropertyValue::Number(f64::INFINITY));
-    node.set_property("neg_inf", PropertyValue::Number(f64::NEG_INFINITY));
+    node.set_property("nan", f64::NAN);
+    node.set_property("inf", f64::INFINITY);
+    node.set_property("neg_inf", f64::NEG_INFINITY);
 
     assert!(node.get_property("nan").is_some());
     assert!(node.get_property("inf").is_some());
@@ -317,24 +317,16 @@ fn edge_property_nan_and_infinity() {
 #[test]
 fn edge_property_empty_string() {
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.set_property("empty", PropertyValue::String(String::new()));
-
-    match node.get_property("empty").unwrap() {
-        PropertyValue::String(s) => assert!(s.is_empty()),
-        _ => panic!("wrong variant"),
-    }
+    node.set_property("empty", String::new());
+    assert_eq!(node.get_property("empty").unwrap(), &serde_json::json!(""));
 }
 
 #[test]
 fn edge_property_very_long_string() {
     let long = "x".repeat(10_000);
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.set_property("long", PropertyValue::String(long.clone()));
-
-    match node.get_property("long").unwrap() {
-        PropertyValue::String(s) => assert_eq!(s.len(), 10_000),
-        _ => panic!("wrong variant"),
-    }
+    node.set_property("long", long.clone());
+    assert_eq!(node.get_property("long").unwrap(), &serde_json::json!(long));
 }
 
 // ===========================================================================
@@ -345,7 +337,7 @@ fn edge_property_very_long_string() {
 fn edge_serde_special_chars_in_strings() {
     let mut graph = GraphDescription::new("special\"chars\\in/name");
     let mut node = NodeInstance::new("node\"1", "add", Position::zero());
-    node.set_property("msg", PropertyValue::String("hello\nworld\ttab".into()));
+    node.set_property("msg", "hello\nworld\ttab");
     graph.add_node(node);
 
     let json = serde_json::to_string(&graph).unwrap();
@@ -357,7 +349,7 @@ fn edge_serde_special_chars_in_strings() {
 fn edge_serde_nan_serializes_as_null() {
     // JSON has no NaN representation. serde_json silently emits null,
     // which means a round-trip will NOT preserve the original NaN value.
-    let json = serde_json::to_string(&PropertyValue::Number(f64::NAN)).unwrap();
+    let json = serde_json::to_string(&serde_json::json!(f64::NAN)).unwrap();
     assert!(
         json.contains("null"),
         "NaN should serialize as null in JSON, got: {}",
@@ -366,37 +358,31 @@ fn edge_serde_nan_serializes_as_null() {
 
     // Deserialization of the null-bearing JSON must fail or produce a
     // different value, proving the round-trip is lossy.
-    let round_trip = serde_json::from_str::<PropertyValue>(&json);
-    assert!(
-        round_trip.is_err(),
-        "Deserializing NaN-as-null back into PropertyValue::Number should fail"
-    );
+    let round_trip = serde_json::from_str::<JsonValue>(&json).unwrap();
+    assert_eq!(round_trip, JsonValue::Null);
 }
 
 #[test]
 fn edge_serde_infinity_serializes_as_null() {
     // JSON has no Infinity representation. serde_json silently emits null.
-    let json = serde_json::to_string(&PropertyValue::Number(f64::INFINITY)).unwrap();
+    let json = serde_json::to_string(&serde_json::json!(f64::INFINITY)).unwrap();
     assert!(
         json.contains("null"),
         "Infinity should serialize as null in JSON, got: {}",
         json
     );
 
-    let round_trip = serde_json::from_str::<PropertyValue>(&json);
-    assert!(
-        round_trip.is_err(),
-        "Deserializing Infinity-as-null back into PropertyValue::Number should fail"
-    );
+    let round_trip = serde_json::from_str::<JsonValue>(&json).unwrap();
+    assert_eq!(round_trip, JsonValue::Null);
 }
 
 #[test]
 fn edge_serde_neg_infinity_serializes_as_null() {
-    let json = serde_json::to_string(&PropertyValue::Number(f64::NEG_INFINITY)).unwrap();
+    let json = serde_json::to_string(&serde_json::json!(f64::NEG_INFINITY)).unwrap();
     assert!(json.contains("null"));
 
-    let round_trip = serde_json::from_str::<PropertyValue>(&json);
-    assert!(round_trip.is_err());
+    let round_trip = serde_json::from_str::<JsonValue>(&json).unwrap();
+    assert_eq!(round_trip, JsonValue::Null);
 }
 
 // ===========================================================================
@@ -412,8 +398,8 @@ fn edge_parallel_single_node() {
     node.add_input_pin("a", DataType::Typed("i64".into()));
     node.add_input_pin("b", DataType::Typed("i64".into()));
     node.add_output_pin("result", DataType::Typed("i64".into()));
-    node.set_property("a", PropertyValue::Number(1.0));
-    node.set_property("b", PropertyValue::Number(2.0));
+    node.set_property("a", 1.0);
+    node.set_property("b", 2.0);
     graph.add_node(node);
 
     let resolver = DataResolver::build_parallel(&graph, &provider).unwrap();
@@ -430,8 +416,8 @@ fn edge_parallel_wide_graph() {
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_input_pin("b", DataType::Typed("i64".into()));
         node.add_output_pin("result", DataType::Typed("i64".into()));
-        node.set_property("a", PropertyValue::Number(1.0));
-        node.set_property("b", PropertyValue::Number(2.0));
+        node.set_property("a", 1.0);
+        node.set_property("b", 2.0);
         graph.add_node(node);
     }
 

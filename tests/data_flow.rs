@@ -27,8 +27,8 @@ fn data_resolver_single_node_with_constants() {
     node.add_input_pin("a", DataType::Typed("i64".into()));
     node.add_input_pin("b", DataType::Typed("i64".into()));
     node.add_output_pin("result", DataType::Typed("i64".into()));
-    node.set_property("a", PropertyValue::Number(5.0));
-    node.set_property("b", PropertyValue::Number(3.0));
+    node.set_property("a", 5.0);
+    node.set_property("b", 3.0);
     graph.add_node(node);
 
     let provider = TestMetadataProvider::with_math_nodes();
@@ -103,7 +103,7 @@ fn data_resolver_connection_overrides_property() {
     let mut node_b = NodeInstance::new("node_b", "add", Position::zero());
     node_b.add_input_pin("a", DataType::Typed("i64".into()));
     // Property set, but a connection exists -> Connection should win
-    node_b.set_property("a", PropertyValue::Number(99.0));
+    node_b.set_property("a", 99.0);
     graph.add_node(node_b);
 
     graph.add_connection(Connection::data("node_a", "result", "node_b", "a"));
@@ -208,8 +208,8 @@ fn data_resolver_independent_nodes_all_included() {
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_input_pin("b", DataType::Typed("i64".into()));
         node.add_output_pin("result", DataType::Typed("i64".into()));
-        node.set_property("a", PropertyValue::Number(1.0));
-        node.set_property("b", PropertyValue::Number(2.0));
+        node.set_property("a", 1.0);
+        node.set_property("b", 2.0);
         graph.add_node(node);
     }
 
@@ -232,14 +232,14 @@ fn data_resolver_detects_cycle() {
     node_a.add_input_pin("a", DataType::Typed("i64".into()));
     node_a.add_input_pin("b", DataType::Typed("i64".into()));
     node_a.add_output_pin("result", DataType::Typed("i64".into()));
-    node_a.set_property("b", PropertyValue::Number(1.0));
+    node_a.set_property("b", 1.0);
     graph.add_node(node_a);
 
     let mut node_b = NodeInstance::new("cycle_b", "add", Position::zero());
     node_b.add_input_pin("a", DataType::Typed("i64".into()));
     node_b.add_input_pin("b", DataType::Typed("i64".into()));
     node_b.add_output_pin("result", DataType::Typed("i64".into()));
-    node_b.set_property("b", PropertyValue::Number(1.0));
+    node_b.set_property("b", 1.0);
     graph.add_node(node_b);
 
     // A -> B and B -> A
@@ -267,7 +267,7 @@ fn data_resolver_three_node_cycle() {
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_input_pin("b", DataType::Typed("i64".into()));
         node.add_output_pin("result", DataType::Typed("i64".into()));
-        node.set_property("b", PropertyValue::Number(1.0));
+        node.set_property("b", 1.0);
         graph.add_node(node);
     }
 
@@ -293,8 +293,8 @@ fn data_resolver_excludes_non_pure_from_order() {
     pure_node.add_input_pin("a", DataType::Typed("i64".into()));
     pure_node.add_input_pin("b", DataType::Typed("i64".into()));
     pure_node.add_output_pin("result", DataType::Typed("i64".into()));
-    pure_node.set_property("a", PropertyValue::Number(1.0));
-    pure_node.set_property("b", PropertyValue::Number(2.0));
+    pure_node.set_property("a", 1.0);
+    pure_node.set_property("b", 2.0);
     graph.add_node(pure_node);
 
     // Function node (not pure)
@@ -358,14 +358,14 @@ fn data_resolver_parallel_detects_cycle() {
     a.add_input_pin("a", DataType::Typed("i64".into()));
     a.add_input_pin("b", DataType::Typed("i64".into()));
     a.add_output_pin("result", DataType::Typed("i64".into()));
-    a.set_property("b", PropertyValue::Number(1.0));
+    a.set_property("b", 1.0);
     graph.add_node(a);
 
     let mut b = NodeInstance::new("b", "add", Position::zero());
     b.add_input_pin("a", DataType::Typed("i64".into()));
     b.add_input_pin("b", DataType::Typed("i64".into()));
     b.add_output_pin("result", DataType::Typed("i64".into()));
-    b.set_property("b", PropertyValue::Number(1.0));
+    b.set_property("b", 1.0);
     graph.add_node(b);
 
     graph.add_connection(Connection::data("a", "result", "b", "a"));
@@ -398,7 +398,7 @@ fn data_resolver_constant_string_value() {
 
     let mut node = NodeInstance::new("n", "print_string", Position::zero());
     node.add_input_pin("message", DataType::Typed("String".into()));
-    node.set_property("message", PropertyValue::String("hello world".into()));
+    node.set_property("message", "hello world");
     graph.add_node(node);
 
     let provider = TestMetadataProvider::empty();
@@ -417,7 +417,7 @@ fn data_resolver_constant_boolean_value() {
 
     let mut node = NodeInstance::new("n", "branch", Position::zero());
     node.add_input_pin("condition", DataType::Typed("bool".into()));
-    node.set_property("condition", PropertyValue::Boolean(true));
+    node.set_property("condition", true);
     graph.add_node(node);
 
     let provider = TestMetadataProvider::empty();
@@ -436,7 +436,7 @@ fn data_resolver_constant_integer_number() {
 
     let mut node = NodeInstance::new("n", "add", Position::zero());
     node.add_input_pin("a", DataType::Typed("i64".into()));
-    node.set_property("a", PropertyValue::Number(42.0));
+    node.set_property("a", 42.0);
     graph.add_node(node);
 
     let provider = TestMetadataProvider::empty();
@@ -455,7 +455,7 @@ fn data_resolver_constant_float_number() {
 
     let mut node = NodeInstance::new("n", "add", Position::zero());
     node.add_input_pin("a", DataType::Typed("f64".into()));
-    node.set_property("a", PropertyValue::Number(3.14));
+    node.set_property("a", 3.14);
     graph.add_node(node);
 
     let provider = TestMetadataProvider::empty();
@@ -474,7 +474,7 @@ fn data_resolver_constant_vector2_value() {
 
     let mut node = NodeInstance::new("n", "pos", Position::zero());
     node.add_input_pin("v", DataType::Vector2);
-    node.set_property("v", PropertyValue::Vector2(1.0, 2.0));
+    node.set_property("v", serde_json::json!([1.0, 2.0]));
     graph.add_node(node);
 
     let provider = TestMetadataProvider::empty();

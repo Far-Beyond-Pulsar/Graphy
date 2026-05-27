@@ -564,21 +564,46 @@ impl DataResolver {
 }
 
 /// Convert a property value to a string representation
-fn property_value_to_string(value: &PropertyValue) -> String {
+fn property_value_to_string(value: &JsonValue) -> String {
     match value {
-        PropertyValue::String(s) => format!("\"{}\"", s.escape_default()),
-        PropertyValue::Number(n) => {
-            // Format number appropriately
-            if n.fract() == 0.0 {
-                format!("{}", *n as i64)
+        JsonValue::String(s) => format!("\"{}\"", s.escape_default()),
+        JsonValue::Number(n) => {
+            if let Some(int) = n.as_i64() {
+                int.to_string()
+            } else if let Some(uint) = n.as_u64() {
+                uint.to_string()
+            } else if let Some(float) = n.as_f64() {
+                if float.fract() == 0.0 {
+                    format!("{}", float as i64)
+                } else {
+                    float.to_string()
+                }
             } else {
                 n.to_string()
             }
         }
-        PropertyValue::Boolean(b) => b.to_string(),
-        PropertyValue::Vector2(x, y) => format!("({}, {})", x, y),
-        PropertyValue::Vector3(x, y, z) => format!("({}, {}, {})", x, y, z),
-        PropertyValue::Color(r, g, b, a) => format!("({}, {}, {}, {})", r, g, b, a),
+        JsonValue::Bool(b) => b.to_string(),
+        JsonValue::Array(items) if items.len() == 2 => {
+            format!("({}, {})", property_value_to_string(&items[0]), property_value_to_string(&items[1]))
+        }
+        JsonValue::Array(items) if items.len() == 3 => {
+            format!(
+                "({}, {}, {})",
+                property_value_to_string(&items[0]),
+                property_value_to_string(&items[1]),
+                property_value_to_string(&items[2])
+            )
+        }
+        JsonValue::Array(items) if items.len() == 4 => {
+            format!(
+                "({}, {}, {}, {})",
+                property_value_to_string(&items[0]),
+                property_value_to_string(&items[1]),
+                property_value_to_string(&items[2]),
+                property_value_to_string(&items[3])
+            )
+        }
+        _ => serde_json::to_string(value).unwrap_or_else(|_| "null".to_string()),
     }
 }
 
@@ -622,8 +647,8 @@ mod tests {
         let mut node = NodeInstance::new("add_1", "add", Position::zero());
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_input_pin("b", DataType::Typed("i64".into()));
-        node.set_property("a", PropertyValue::Number(5.0));
-        node.set_property("b", PropertyValue::Number(3.0));
+        node.set_property("a", 5.0);
+        node.set_property("b", 3.0);
         graph.add_node(node);
 
         let provider = TestMetadataProvider {

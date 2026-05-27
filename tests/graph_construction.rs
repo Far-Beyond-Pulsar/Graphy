@@ -79,7 +79,7 @@ fn graph_get_node_mut() {
     graph.add_node(NodeInstance::new("node_1", "add", Position::zero()));
 
     let node_mut = graph.get_node_mut("node_1").unwrap();
-    node_mut.set_property("x", PropertyValue::Number(99.0));
+    node_mut.set_property("x", 99.0);
 
     let node = graph.get_node("node_1").unwrap();
     assert!(node.get_property("x").is_some());
@@ -103,11 +103,11 @@ fn graph_add_node_overwrites_same_id() {
     let mut graph = GraphDescription::new("test");
 
     let mut node_v1 = NodeInstance::new("same_id", "add", Position::zero());
-    node_v1.set_property("version", PropertyValue::Number(1.0));
+    node_v1.set_property("version", 1.0);
     graph.add_node(node_v1);
 
     let mut node_v2 = NodeInstance::new("same_id", "multiply", Position::zero());
-    node_v2.set_property("version", PropertyValue::Number(2.0));
+    node_v2.set_property("version", 2.0);
     graph.add_node(node_v2);
 
     assert_eq!(graph.nodes.len(), 1);

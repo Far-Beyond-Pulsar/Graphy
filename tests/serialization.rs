@@ -80,85 +80,55 @@ fn serde_nodetypes_event() {
 }
 
 // ===========================================================================
-// PropertyValue serialization
+// JsonValue serialization
 // ===========================================================================
 
 #[test]
 fn serde_property_string() {
-    let pv = PropertyValue::String("hello world".into());
+    let pv: JsonValue = serde_json::json!("hello world");
     let json = serde_json::to_string(&pv).unwrap();
-    let deserialized: PropertyValue = serde_json::from_str(&json).unwrap();
-    match deserialized {
-        PropertyValue::String(s) => assert_eq!(s, "hello world"),
-        _ => panic!("wrong variant"),
-    }
+    let deserialized: JsonValue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, serde_json::json!("hello world"));
 }
 
 #[test]
 fn serde_property_number() {
-    let pv = PropertyValue::Number(3.1415926);
+    let pv: JsonValue = serde_json::json!(3.1415926);
     let json = serde_json::to_string(&pv).unwrap();
-    let deserialized: PropertyValue = serde_json::from_str(&json).unwrap();
-    match deserialized {
-        PropertyValue::Number(n) => assert!((n - 3.1415926).abs() < f64::EPSILON),
-        _ => panic!("wrong variant"),
-    }
+    let deserialized: JsonValue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, serde_json::json!(3.1415926));
 }
 
 #[test]
 fn serde_property_boolean() {
-    let pv = PropertyValue::Boolean(true);
+    let pv: JsonValue = serde_json::json!(true);
     let json = serde_json::to_string(&pv).unwrap();
-    let deserialized: PropertyValue = serde_json::from_str(&json).unwrap();
-    match deserialized {
-        PropertyValue::Boolean(b) => assert!(b),
-        _ => panic!("wrong variant"),
-    }
+    let deserialized: JsonValue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, serde_json::json!(true));
 }
 
 #[test]
 fn serde_property_vector2() {
-    let pv = PropertyValue::Vector2(1.5, -2.5);
+    let pv: JsonValue = serde_json::json!([1.5, -2.5]);
     let json = serde_json::to_string(&pv).unwrap();
-    let deserialized: PropertyValue = serde_json::from_str(&json).unwrap();
-    match deserialized {
-        PropertyValue::Vector2(x, y) => {
-            assert_eq!(x, 1.5);
-            assert_eq!(y, -2.5);
-        }
-        _ => panic!("wrong variant"),
-    }
+    let deserialized: JsonValue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, serde_json::json!([1.5, -2.5]));
 }
 
 #[test]
 fn serde_property_vector3() {
-    let pv = PropertyValue::Vector3(1.0, 2.0, 3.0);
+    let pv: JsonValue = serde_json::json!([1.0, 2.0, 3.0]);
     let json = serde_json::to_string(&pv).unwrap();
-    let deserialized: PropertyValue = serde_json::from_str(&json).unwrap();
-    match deserialized {
-        PropertyValue::Vector3(x, y, z) => {
-            assert_eq!(x, 1.0);
-            assert_eq!(y, 2.0);
-            assert_eq!(z, 3.0);
-        }
-        _ => panic!("wrong variant"),
-    }
+    let deserialized: JsonValue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, serde_json::json!([1.0, 2.0, 3.0]));
 }
 
 #[test]
 fn serde_property_color() {
-    let pv = PropertyValue::Color(1.0, 0.5, 0.0, 0.8);
+    let pv: JsonValue = serde_json::json!([1.0, 0.5, 0.0, 0.8]);
     let json = serde_json::to_string(&pv).unwrap();
-    let deserialized: PropertyValue = serde_json::from_str(&json).unwrap();
-    match deserialized {
-        PropertyValue::Color(r, g, b, a) => {
-            assert_eq!(r, 1.0);
-            assert_eq!(g, 0.5);
-            assert_eq!(b, 0.0);
-            assert_eq!(a, 0.8);
-        }
-        _ => panic!("wrong variant"),
-    }
+    let deserialized: JsonValue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, serde_json::json!([1.0, 0.5, 0.0, 0.8]));
 }
 
 // ===========================================================================
@@ -205,7 +175,7 @@ fn serde_node_instance_basic() {
     let mut node = NodeInstance::new("node_1", "add", Position::new(10.0, 20.0));
     node.add_input_pin("a", DataType::Typed("i64".into()));
     node.add_output_pin("result", DataType::Typed("i64".into()));
-    node.set_property("a", PropertyValue::Number(5.0));
+    node.set_property("a", 5.0);
 
     let json = serde_json::to_string(&node).unwrap();
     let deserialized: NodeInstance = serde_json::from_str(&json).unwrap();
@@ -232,15 +202,15 @@ fn serde_full_graph_round_trip() {
     n1.add_input_pin("a", DataType::Typed("i64".into()));
     n1.add_input_pin("b", DataType::Typed("i64".into()));
     n1.add_output_pin("result", DataType::Typed("i64".into()));
-    n1.set_property("a", PropertyValue::Number(10.0));
-    n1.set_property("b", PropertyValue::Number(20.0));
+    n1.set_property("a", 10.0);
+    n1.set_property("b", 20.0);
     graph.add_node(n1);
 
     let mut n2 = NodeInstance::new("print_1", "print", Position::new(200.0, 0.0));
     n2.add_input_pin("exec_in", DataType::Execution);
     n2.add_input_pin("message", DataType::Typed("String".into()));
     n2.add_output_pin("exec_out", DataType::Execution);
-    n2.set_property("message", PropertyValue::String("hello".into()));
+    n2.set_property("message", "hello");
     graph.add_node(n2);
 
     // Add connections
@@ -333,7 +303,7 @@ fn serde_large_graph() {
         let mut node = NodeInstance::new(format!("n_{}", i), "add", Position::new(i as f64, 0.0));
         node.add_input_pin("a", DataType::Typed("i64".into()));
         node.add_output_pin("result", DataType::Typed("i64".into()));
-        node.set_property("a", PropertyValue::Number(i as f64));
+        node.set_property("a", i as f64);
         graph.add_node(node);
     }
 

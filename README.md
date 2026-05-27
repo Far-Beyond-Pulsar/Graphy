@@ -91,7 +91,7 @@ cargo add graphy
 ```rust
 use graphy::{
     GraphDescription, NodeInstance, Connection, Pin, PinInstance,
-    DataType, NodeTypes, PropertyValue, ConnectionType,
+    DataType, NodeTypes, ConnectionType,
     DataResolver, ExecutionRouting, CodeGeneratorContext,
 };
 
@@ -104,8 +104,8 @@ graph.add_node(NodeInstance {
     node_type: "math.add".to_string(),
     position: Default::default(),
     properties: vec![
-        ("a".to_string(), PropertyValue::Number(5.0)),
-        ("b".to_string(), PropertyValue::Number(3.0)),
+        ("a".to_string(), serde_json::json!(5.0)),
+        ("b".to_string(), serde_json::json!(3.0)),
     ].into_iter().collect(),
 });
 
@@ -275,7 +275,7 @@ pub struct NodeInstance {
     pub id: String,
     pub node_type: String,
     pub position: Position,
-    pub properties: HashMap<String, PropertyValue>,
+    pub properties: HashMap<String, serde_json::Value>,
 }
 ```
 

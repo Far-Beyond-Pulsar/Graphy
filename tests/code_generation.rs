@@ -174,8 +174,8 @@ fn collect_args_with_properties() {
         ]);
 
     let mut node = NodeInstance::new("add_1", "add", Position::zero());
-    node.set_property("a", PropertyValue::Number(5.0));
-    node.set_property("b", PropertyValue::Number(3.0));
+    node.set_property("a", 5.0);
+    node.set_property("b", 3.0);
 
     let args = collect_node_arguments(&node, &meta).unwrap();
     assert_eq!(args.len(), 2);
@@ -208,7 +208,7 @@ fn collect_args_mixed_properties_and_defaults() {
         ]);
 
     let mut node = NodeInstance::new("add_1", "add", Position::zero());
-    node.set_property("a", PropertyValue::Number(7.5));
+    node.set_property("a", 7.5);
     // "b" not set
 
     let args = collect_node_arguments(&node, &meta).unwrap();

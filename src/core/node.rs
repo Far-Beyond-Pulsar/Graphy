@@ -10,16 +10,16 @@
 //! # Example
 //!
 //! ```
-//! use graphy::{NodeInstance, Position, DataType, PropertyValue};
+//! use graphy::{NodeInstance, Position, DataType};
 //!
 //! let mut node = NodeInstance::new("add_1", "math.add", Position::zero());
 //! node.add_input_pin("a", DataType::Number);
 //! node.add_input_pin("b", DataType::Number);
 //! node.add_output_pin("result", DataType::Number);
-//! node.set_property("default_a", PropertyValue::Number(0.0));
+//! node.set_property("default_a", serde_json::json!(0.0));
 //! ```
 
-use super::{DataType, Position, PropertyValue};
+use super::{DataType, JsonValue, Position};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -125,7 +125,7 @@ pub struct NodeInstance {
     pub outputs: Vec<PinInstance>,
 
     /// Constant property values (defaults, configuration, etc.)
-    pub properties: HashMap<String, PropertyValue>,
+    pub properties: HashMap<String, JsonValue>,
 }
 
 impl NodeInstance {
@@ -189,14 +189,14 @@ impl NodeInstance {
     /// # Example
     ///
     /// ```
-    /// use graphy::{NodeInstance, Position, PropertyValue};
+    /// use graphy::{NodeInstance, Position};
     ///
     /// let mut node = NodeInstance::new("const_1", "constant", Position::zero());
-    /// node.set_property("value", PropertyValue::Number(42.0));
+    /// node.set_property("value", serde_json::json!(42.0));
     /// ```
     #[inline]
-    pub fn set_property(&mut self, key: impl Into<String>, value: PropertyValue) {
-        self.properties.insert(key.into(), value);
+    pub fn set_property(&mut self, key: impl Into<String>, value: impl Into<JsonValue>) {
+        self.properties.insert(key.into(), value.into());
     }
 
     /// Gets a property value by key.
@@ -207,7 +207,7 @@ impl NodeInstance {
     ///
     /// This is an O(1) operation thanks to `HashMap` storage.
     #[inline]
-    pub fn get_property(&self, key: &str) -> Option<&PropertyValue> {
+    pub fn get_property(&self, key: &str) -> Option<&JsonValue> {
         self.properties.get(key)
     }
 }

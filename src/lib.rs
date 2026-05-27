@@ -73,7 +73,7 @@ pub mod logging;
 // Re-export commonly used types
 pub use core::{
     GraphDescription, NodeInstance, Connection, Pin, PinInstance,
-    DataType, TypeInfo, NodeTypes, Position, ConnectionType, PropertyValue,
+    DataType, TypeInfo, NodeTypes, Position, ConnectionType, JsonValue,
     GraphMetadata, NodeMetadata, ParamInfo, NodeMetadataProvider, PinType,
 };
 

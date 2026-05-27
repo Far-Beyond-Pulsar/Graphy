@@ -157,8 +157,8 @@ fn pipeline_mixed_data_and_execution() {
     add_node.add_input_pin("a", DataType::Typed("i64".into()));
     add_node.add_input_pin("b", DataType::Typed("i64".into()));
     add_node.add_output_pin("result", DataType::Typed("i64".into()));
-    add_node.set_property("a", PropertyValue::Number(5.0));
-    add_node.set_property("b", PropertyValue::Number(3.0));
+    add_node.set_property("a", 5.0);
+    add_node.set_property("b", 3.0);
     graph.add_node(add_node);
 
     // Event entry
