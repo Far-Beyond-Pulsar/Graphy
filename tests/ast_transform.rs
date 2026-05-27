@@ -151,7 +151,9 @@ fn inline_with_param_substitution() {
 }
 
 #[test]
-fn inline_empty_replacements() {
+fn inline_empty_replacements_erases_exec_output_macros() {
+    // Regression: unmatched exec_output!() must NOT appear in output.
+    // Old behaviour left them verbatim → Rust compiler error "cannot find macro exec_output".
     let source = r#"
         fn noop(condition: bool) {
             if condition {
@@ -162,12 +164,18 @@ fn inline_empty_replacements() {
         }
     "#;
 
-    let exec_replacements = HashMap::new();
+    let exec_replacements = HashMap::new(); // nothing connected
     let param_substitutions = HashMap::new();
 
-    // Should succeed even without replacements (labels just stay as-is or get ignored)
     let result = inline_control_flow_function(source, exec_replacements, param_substitutions);
     assert!(result.is_ok());
+
+    let code = result.unwrap();
+    // Must NOT contain bare exec_output! — that would be a compile error in the emitted Rust.
+    assert!(
+        !code.contains("exec_output"),
+        "unmatched exec_output! survived into output: {code}"
+    );
 }
 
 #[test]
@@ -248,4 +256,205 @@ fn inline_nested_if_else() {
 
     let result = inline_control_flow_function(source, exec_replacements, HashMap::new());
     assert!(result.is_ok());
+}
+
+// ===========================================================================
+// REGRESSION: exec_output! substitution bugs (fixed in cd8961d)
+// ===========================================================================
+
+/// A Sequence-like node with four ordered outputs — the canonical blueprint pattern.
+const SEQUENCE_SOURCE: &str = r#"
+    fn sequence() {
+        exec_output!("Then0");
+        exec_output!("Then1");
+        exec_output!("Then2");
+        exec_output!("Then3");
+    }
+"#;
+
+/// Regression: single-statement replacement must appear in output.
+#[test]
+fn regression_sequence_single_stmt_per_output() {
+    let mut exec_replacements = HashMap::new();
+    exec_replacements.insert("Then0".to_string(), "foo();".to_string());
+    exec_replacements.insert("Then1".to_string(), "bar();".to_string());
+    exec_replacements.insert("Then2".to_string(), "baz();".to_string());
+    exec_replacements.insert("Then3".to_string(), "qux();".to_string());
+
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
+        .expect("inline failed");
+
+    assert!(code.contains("foo"), "Then0 stmt missing: {code}");
+    assert!(code.contains("bar"), "Then1 stmt missing: {code}");
+    assert!(code.contains("baz"), "Then2 stmt missing: {code}");
+    assert!(code.contains("qux"), "Then3 stmt missing: {code}");
+    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
+}
+
+/// Regression: multi-statement replacement — ALL statements must appear, not just the first.
+///
+/// The old bug: `first_stmt.clone()` dropped every statement after the first, so a
+/// chain of four nodes following a Sequence output became a single call in the Rust output.
+#[test]
+fn regression_sequence_multi_stmt_chain_all_emitted() {
+    let multi_stmt = "
+        print_number(1.0);
+        print_number(2.0);
+        println(String::new());
+        print_formatted(String::new(), String::new());
+    ";
+
+    let mut exec_replacements = HashMap::new();
+    exec_replacements.insert("Then0".to_string(), multi_stmt.to_string());
+    exec_replacements.insert("Then1".to_string(), "print_bool(false);".to_string());
+    exec_replacements.insert("Then2".to_string(), String::new()); // empty
+    exec_replacements.insert("Then3".to_string(), String::new()); // empty
+
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
+        .expect("inline failed");
+
+    // quote! emits token streams with spaces between tokens (e.g. `print_number (1.0)`),
+    // so check by function name only rather than the full call site.
+    //
+    // All four calls in Then0's chain must be present.
+    // print_number appears for both 1.0 and 2.0, println, and print_formatted.
+    let print_number_count = code.matches("print_number").count();
+    assert!(
+        print_number_count >= 2,
+        "Then0 should have 2× print_number, got {print_number_count}: {code}"
+    );
+    assert!(code.contains("println"),         "3rd stmt of Then0 (println) missing: {code}");
+    assert!(code.contains("print_formatted"), "4th stmt of Then0 (print_formatted) missing: {code}");
+
+    // Then1's single stmt must also be present.
+    assert!(code.contains("print_bool"),      "Then1 stmt missing: {code}");
+
+    // No bare exec_output! should survive into the output.
+    assert!(!code.contains("exec_output"),    "bare exec_output! in output: {code}");
+}
+
+/// Regression: unconnected outputs (no replacement key) must produce empty code,
+/// NOT leave `exec_output!("Then2")` verbatim — which causes a Rust compile error.
+#[test]
+fn regression_unconnected_outputs_erased_not_emitted() {
+    // Only Then0 is connected; Then1–Then3 have no replacement at all.
+    let mut exec_replacements = HashMap::new();
+    exec_replacements.insert("Then0".to_string(), "connected();".to_string());
+    // Then1, Then2, Then3 intentionally absent from the map.
+
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
+        .expect("inline failed");
+
+    assert!(code.contains("connected"),    "Then0 stmt missing: {code}");
+    assert!(!code.contains("exec_output"), "bare exec_output! survived: {code}");
+}
+
+/// Regression: empty-string replacement (explicitly empty) must also not emit exec_output!.
+#[test]
+fn regression_empty_string_replacement_erased() {
+    let mut exec_replacements = HashMap::new();
+    exec_replacements.insert("Then0".to_string(), "do_work();".to_string());
+    exec_replacements.insert("Then1".to_string(), String::new()); // explicit empty
+    exec_replacements.insert("Then2".to_string(), String::new());
+    exec_replacements.insert("Then3".to_string(), String::new());
+
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
+        .expect("inline failed");
+
+    assert!(code.contains("do_work"),      "Then0 stmt missing: {code}");
+    assert!(!code.contains("exec_output"), "bare exec_output! survived: {code}");
+}
+
+/// Regression: fully unconnected Sequence (nothing wired up) produces
+/// valid output with no exec_output! calls.
+#[test]
+fn regression_fully_unconnected_sequence_no_exec_output_in_output() {
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, HashMap::new(), HashMap::new())
+        .expect("inline failed");
+
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! survived in fully-unconnected sequence: {code}"
+    );
+}
+
+/// Regression: the exact 6-node blueprint from the bug report.
+///
+/// Graph: BeginPlay → print_number → print_number → println → print_formatted
+///        → Sequence { Then0 → print_bool, Then1 → print_number, Then2 ∅, Then3 ∅ }
+///
+/// Before the fix, the Rust output only had 4 calls (the linear chain) and either
+/// missed the Sequence branches or emitted bare exec_output! causing a compile error.
+#[test]
+fn regression_six_node_blueprint_all_calls_emitted() {
+    // Simulate the exec chains the code generator passes in.
+    // In the real graph the Sequence node is reached AFTER the 4-node linear chain;
+    // for this test we only exercise the Sequence inlining itself.
+    let then0_chain = "
+        print_bool(false);
+    ";
+    let then1_chain = "
+        print_number(0.0f64);
+    ";
+
+    let mut exec_replacements = HashMap::new();
+    exec_replacements.insert("Then0".to_string(), then0_chain.to_string());
+    exec_replacements.insert("Then1".to_string(), then1_chain.to_string());
+    // Then2, Then3: not in the map (simulates unconnected outputs)
+
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
+        .expect("inline failed");
+
+    // Both Sequence branches must be emitted.
+    assert!(code.contains("print_bool"),   "Then0 (print_bool) missing: {code}");
+    assert!(code.contains("print_number"), "Then1 (print_number) missing: {code}");
+
+    // No bare exec_output! in output.
+    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
+}
+
+/// Regression: a Sequence where Then0 has a LONG chain (5 nodes).
+/// Every node in the chain must appear — not just the first.
+#[test]
+fn regression_long_chain_after_sequence_output_fully_emitted() {
+    let long_chain = "
+        step_one();
+        step_two();
+        step_three();
+        step_four();
+        step_five();
+    ";
+
+    let mut exec_replacements = HashMap::new();
+    exec_replacements.insert("Then0".to_string(), long_chain.to_string());
+    exec_replacements.insert("Then1".to_string(), String::new());
+    exec_replacements.insert("Then2".to_string(), String::new());
+    exec_replacements.insert("Then3".to_string(), String::new());
+
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
+        .expect("inline failed");
+
+    for i in 1..=5 {
+        let name = format!("step_{}", ["one", "two", "three", "four", "five"][i - 1]);
+        assert!(code.contains(&name), "step {i} missing from long chain: {code}");
+    }
+    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
+}
+
+/// Regression: multi-statement chains on MULTIPLE outputs must all be present.
+#[test]
+fn regression_multi_stmt_on_multiple_outputs() {
+    let mut exec_replacements = HashMap::new();
+    exec_replacements.insert("Then0".to_string(), "a1(); a2(); a3();".to_string());
+    exec_replacements.insert("Then1".to_string(), "b1(); b2();".to_string());
+    exec_replacements.insert("Then2".to_string(), "c1();".to_string());
+    exec_replacements.insert("Then3".to_string(), String::new());
+
+    let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
+        .expect("inline failed");
+
+    for sym in &["a1", "a2", "a3", "b1", "b2", "c1"] {
+        assert!(code.contains(sym), "{sym} missing from multi-output multi-stmt: {code}");
+    }
+    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
 }
