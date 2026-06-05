@@ -24,11 +24,11 @@ fn exec_routing_single_connection() {
     let mut graph = GraphDescription::new("test");
 
     let mut n1 = NodeInstance::new("node1", "print", Position::zero());
-    n1.add_output_pin("exec_out", DataType::Execution);
+    n1.add_output_pin("exec_out", DataType::Exec);
     graph.add_node(n1);
 
     let mut n2 = NodeInstance::new("node2", "print", Position::zero());
-    n2.add_input_pin("exec_in", DataType::Execution);
+    n2.add_input_pin("exec_in", DataType::Exec);
     graph.add_node(n2);
 
     graph.add_connection(Connection::execution("node1", "exec_out", "node2", "exec_in"));
@@ -80,12 +80,12 @@ fn exec_routing_multiple_targets_from_one_pin() {
     let mut graph = GraphDescription::new("fan_out");
 
     let mut source = NodeInstance::new("source", "event", Position::zero());
-    source.add_output_pin("exec", DataType::Execution);
+    source.add_output_pin("exec", DataType::Exec);
     graph.add_node(source);
 
     for i in 0..3 {
         let mut target = NodeInstance::new(format!("target_{}", i), "print", Position::zero());
-        target.add_input_pin("exec_in", DataType::Execution);
+        target.add_input_pin("exec_in", DataType::Exec);
         graph.add_node(target);
 
         graph.add_connection(Connection::execution(
@@ -165,11 +165,11 @@ fn exec_routing_ignores_data_connections() {
     let mut graph = GraphDescription::new("data_only");
 
     let mut a = NodeInstance::new("a", "add", Position::zero());
-    a.add_output_pin("result", DataType::Typed("i64".into()));
+    a.add_output_pin("result", DataType::typed("i64"));
     graph.add_node(a);
 
     let mut b = NodeInstance::new("b", "add", Position::zero());
-    b.add_input_pin("a", DataType::Typed("i64".into()));
+    b.add_input_pin("a", DataType::typed("i64"));
     graph.add_node(b);
 
     graph.add_connection(Connection::data("a", "result", "b", "a"));
@@ -190,8 +190,8 @@ fn exec_routing_diamond_execution() {
 
     for id in ["a", "b", "c", "d"] {
         let mut node = NodeInstance::new(id, "fn", Position::zero());
-        node.add_input_pin("exec_in", DataType::Execution);
-        node.add_output_pin("exec_out", DataType::Execution);
+        node.add_input_pin("exec_in", DataType::Exec);
+        node.add_output_pin("exec_out", DataType::Exec);
         graph.add_node(node);
     }
 

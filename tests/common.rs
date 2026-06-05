@@ -177,9 +177,9 @@ pub fn build_linear_chain(n: usize, provider: &TestMetadataProvider) -> GraphDes
             "add",
             Position::new(i as f64 * 200.0, 0.0),
         );
-        node.add_input_pin("a", DataType::Typed("i64".into()));
-        node.add_input_pin("b", DataType::Typed("i64".into()));
-        node.add_output_pin("result", DataType::Typed("i64".into()));
+        node.add_input_pin("a", DataType::typed("i64"));
+        node.add_input_pin("b", DataType::typed("i64"));
+        node.add_output_pin("result", DataType::typed("i64"));
         node.set_property("b", 1.0);
         graph.add_node(node);
     }
@@ -214,9 +214,9 @@ pub fn build_diamond_graph() -> GraphDescription {
         ("node_d", "add"),
     ] {
         let mut node = NodeInstance::new(id, node_type, Position::zero());
-        node.add_input_pin("a", DataType::Typed("i64".into()));
-        node.add_input_pin("b", DataType::Typed("i64".into()));
-        node.add_output_pin("result", DataType::Typed("i64".into()));
+        node.add_input_pin("a", DataType::typed("i64"));
+        node.add_input_pin("b", DataType::typed("i64"));
+        node.add_output_pin("result", DataType::typed("i64"));
         node.set_property("a", 1.0);
         node.set_property("b", 2.0);
         graph.add_node(node);
@@ -240,9 +240,9 @@ pub fn build_exec_chain(n: usize) -> GraphDescription {
             "print_string",
             Position::new(i as f64 * 200.0, 0.0),
         );
-        node.add_input_pin("exec_in", DataType::Execution);
-        node.add_input_pin("message", DataType::Typed("String".into()));
-        node.add_output_pin("exec_out", DataType::Execution);
+        node.add_input_pin("exec_in", DataType::Exec);
+        node.add_input_pin("message", DataType::typed("String"));
+        node.add_output_pin("exec_out", DataType::Exec);
         node.set_property("message", format!("step {}", i));
         graph.add_node(node);
     }
@@ -265,31 +265,31 @@ pub fn build_branch_graph() -> GraphDescription {
 
     // Event entry
     let mut event = NodeInstance::new("start", "on_start", Position::zero());
-    event.add_output_pin("exec", DataType::Execution);
+    event.add_output_pin("exec", DataType::Exec);
     graph.add_node(event);
 
     // Branch node
     let mut branch = NodeInstance::new("branch_1", "branch", Position::new(200.0, 0.0));
-    branch.add_input_pin("exec_in", DataType::Execution);
-    branch.add_input_pin("condition", DataType::Typed("bool".into()));
-    branch.add_output_pin("True", DataType::Execution);
-    branch.add_output_pin("False", DataType::Execution);
+    branch.add_input_pin("exec_in", DataType::Exec);
+    branch.add_input_pin("condition", DataType::typed("bool"));
+    branch.add_output_pin("True", DataType::Exec);
+    branch.add_output_pin("False", DataType::Exec);
     branch.set_property("condition", true);
     graph.add_node(branch);
 
     // True-side print
     let mut print_true = NodeInstance::new("print_true", "print_string", Position::new(400.0, -100.0));
-    print_true.add_input_pin("exec_in", DataType::Execution);
-    print_true.add_input_pin("message", DataType::Typed("String".into()));
-    print_true.add_output_pin("exec_out", DataType::Execution);
+    print_true.add_input_pin("exec_in", DataType::Exec);
+    print_true.add_input_pin("message", DataType::typed("String"));
+    print_true.add_output_pin("exec_out", DataType::Exec);
     print_true.set_property("message", "true branch");
     graph.add_node(print_true);
 
     // False-side print
     let mut print_false = NodeInstance::new("print_false", "print_string", Position::new(400.0, 100.0));
-    print_false.add_input_pin("exec_in", DataType::Execution);
-    print_false.add_input_pin("message", DataType::Typed("String".into()));
-    print_false.add_output_pin("exec_out", DataType::Execution);
+    print_false.add_input_pin("exec_in", DataType::Exec);
+    print_false.add_input_pin("message", DataType::typed("String"));
+    print_false.add_output_pin("exec_out", DataType::Exec);
     print_false.set_property("message", "false branch");
     graph.add_node(print_false);
 

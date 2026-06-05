@@ -154,23 +154,23 @@ fn pipeline_mixed_data_and_execution() {
 
     // Pure computation
     let mut add_node = NodeInstance::new("add_1", "add", Position::zero());
-    add_node.add_input_pin("a", DataType::Typed("i64".into()));
-    add_node.add_input_pin("b", DataType::Typed("i64".into()));
-    add_node.add_output_pin("result", DataType::Typed("i64".into()));
+    add_node.add_input_pin("a", DataType::typed("i64"));
+    add_node.add_input_pin("b", DataType::typed("i64"));
+    add_node.add_output_pin("result", DataType::typed("i64"));
     add_node.set_property("a", 5.0);
     add_node.set_property("b", 3.0);
     graph.add_node(add_node);
 
     // Event entry
     let mut event = NodeInstance::new("start", "on_start", Position::new(0.0, 200.0));
-    event.add_output_pin("exec", DataType::Execution);
+    event.add_output_pin("exec", DataType::Exec);
     graph.add_node(event);
 
     // Print (function node that consumes the pure result)
     let mut print = NodeInstance::new("print_1", "print_string", Position::new(200.0, 200.0));
-    print.add_input_pin("exec_in", DataType::Execution);
-    print.add_input_pin("message", DataType::Typed("String".into()));
-    print.add_output_pin("exec_out", DataType::Execution);
+    print.add_input_pin("exec_in", DataType::Exec);
+    print.add_input_pin("message", DataType::typed("String"));
+    print.add_output_pin("exec_out", DataType::Exec);
     graph.add_node(print);
 
     // Data connection: add_1.result -> print_1.message

@@ -84,9 +84,9 @@ fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
                 Position::new(col as f64 * 100.0, row as f64 * 100.0)
             );
 
-            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::Typed("f64".into()), PinType::Input)));
-            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::Typed("f64".into()), PinType::Input)));
-            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::Typed("f64".into()), PinType::Output)));
+            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::typed("f64"), PinType::Input)));
+            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::typed("f64"), PinType::Input)));
+            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::typed("f64"), PinType::Output)));
 
             // Edge nodes have constants
             if col == 0 || row == 0 {

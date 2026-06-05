@@ -69,12 +69,21 @@ pub mod generation;
 pub mod utils;
 pub mod parallel;
 pub mod logging;
+pub mod diagnostics;
+pub mod type_checker;
 
 // Re-export commonly used types
 pub use core::{
     GraphDescription, NodeInstance, Connection, Pin, PinInstance,
     DataType, TypeInfo, NodeTypes, Position, ConnectionType, JsonValue,
     GraphMetadata, NodeMetadata, ParamInfo, NodeMetadataProvider, PinType,
+    // v2 types
+    NodeKind, PropertyValue, PropertySchema, ReflectedType, PrimitiveKind,
+    ParamMeta,
+    // document model
+    BlueprintDocument, BlueprintMetadata, ClassVariable, DocumentEditorState,
+    Graph, GraphId, GraphInterface, GraphKind, GraphViewState, InterfacePin,
+    DOCUMENT_FORMAT_VERSION,
 };
 
 pub use analysis::{
@@ -100,6 +109,14 @@ pub use logging::{
 
 pub use utils::{
     SubGraphExpander,
+};
+
+pub use diagnostics::{
+    CompileResult, Diagnostic, DiagnosticAccumulator, PassName, Severity, SourceLocation,
+};
+
+pub use type_checker::{
+    Coercion, CoercionRegistry, TypeChecker,
 };
 
 /// Result type used throughout Graphy
