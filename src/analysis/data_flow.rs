@@ -645,8 +645,8 @@ mod tests {
         let mut graph = GraphDescription::new("test");
 
         let mut node = NodeInstance::new("add_1", "add", Position::zero());
-        node.add_input_pin("a", DataType::Typed("i64".into()));
-        node.add_input_pin("b", DataType::Typed("i64".into()));
+        node.add_input_pin("a", DataType::typed("i64"));
+        node.add_input_pin("b", DataType::typed("i64"));
         node.set_property("a", 5.0);
         node.set_property("b", 3.0);
         graph.add_node(node);

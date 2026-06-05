@@ -31,9 +31,9 @@ fn edge_single_node_no_connections() {
     let provider = TestMetadataProvider::with_math_nodes();
 
     let mut node = NodeInstance::new("lonely", "add", Position::zero());
-    node.add_input_pin("a", DataType::Typed("i64".into()));
-    node.add_input_pin("b", DataType::Typed("i64".into()));
-    node.add_output_pin("result", DataType::Typed("i64".into()));
+    node.add_input_pin("a", DataType::typed("i64"));
+    node.add_input_pin("b", DataType::typed("i64"));
+    node.add_output_pin("result", DataType::typed("i64"));
     node.set_property("a", 1.0);
     node.set_property("b", 2.0);
     graph.add_node(node);
@@ -52,7 +52,7 @@ fn edge_special_chars_in_node_id() {
     let mut graph = GraphDescription::new("test");
 
     let mut node = NodeInstance::new("node-with.special@chars!", "add", Position::zero());
-    node.add_input_pin("a", DataType::Typed("i64".into()));
+    node.add_input_pin("a", DataType::typed("i64"));
     node.set_property("a", 1.0);
     graph.add_node(node);
 
@@ -100,17 +100,17 @@ fn edge_disconnected_subgraphs() {
 
     // Subgraph 1: a -> b
     let mut a = NodeInstance::new("a", "add", Position::zero());
-    a.add_input_pin("a", DataType::Typed("i64".into()));
-    a.add_input_pin("b", DataType::Typed("i64".into()));
-    a.add_output_pin("result", DataType::Typed("i64".into()));
+    a.add_input_pin("a", DataType::typed("i64"));
+    a.add_input_pin("b", DataType::typed("i64"));
+    a.add_output_pin("result", DataType::typed("i64"));
     a.set_property("a", 1.0);
     a.set_property("b", 2.0);
     graph.add_node(a);
 
     let mut b = NodeInstance::new("b", "add", Position::zero());
-    b.add_input_pin("a", DataType::Typed("i64".into()));
-    b.add_input_pin("b", DataType::Typed("i64".into()));
-    b.add_output_pin("result", DataType::Typed("i64".into()));
+    b.add_input_pin("a", DataType::typed("i64"));
+    b.add_input_pin("b", DataType::typed("i64"));
+    b.add_output_pin("result", DataType::typed("i64"));
     b.set_property("b", 3.0);
     graph.add_node(b);
 
@@ -118,17 +118,17 @@ fn edge_disconnected_subgraphs() {
 
     // Subgraph 2: c -> d (completely disconnected)
     let mut c = NodeInstance::new("c", "multiply", Position::new(500.0, 0.0));
-    c.add_input_pin("a", DataType::Typed("i64".into()));
-    c.add_input_pin("b", DataType::Typed("i64".into()));
-    c.add_output_pin("result", DataType::Typed("i64".into()));
+    c.add_input_pin("a", DataType::typed("i64"));
+    c.add_input_pin("b", DataType::typed("i64"));
+    c.add_output_pin("result", DataType::typed("i64"));
     c.set_property("a", 4.0);
     c.set_property("b", 5.0);
     graph.add_node(c);
 
     let mut d = NodeInstance::new("d", "multiply", Position::new(700.0, 0.0));
-    d.add_input_pin("a", DataType::Typed("i64".into()));
-    d.add_input_pin("b", DataType::Typed("i64".into()));
-    d.add_output_pin("result", DataType::Typed("i64".into()));
+    d.add_input_pin("a", DataType::typed("i64"));
+    d.add_input_pin("b", DataType::typed("i64"));
+    d.add_output_pin("result", DataType::typed("i64"));
     d.set_property("b", 6.0);
     graph.add_node(d);
 
@@ -164,18 +164,18 @@ fn edge_large_wide_graph() {
 
     // One source, 100 targets (fan-out)
     let mut source = NodeInstance::new("source", "add", Position::zero());
-    source.add_input_pin("a", DataType::Typed("i64".into()));
-    source.add_input_pin("b", DataType::Typed("i64".into()));
-    source.add_output_pin("result", DataType::Typed("i64".into()));
+    source.add_input_pin("a", DataType::typed("i64"));
+    source.add_input_pin("b", DataType::typed("i64"));
+    source.add_output_pin("result", DataType::typed("i64"));
     source.set_property("a", 1.0);
     source.set_property("b", 1.0);
     graph.add_node(source);
 
     for i in 0..100 {
         let mut node = NodeInstance::new(format!("fan_{}", i), "add", Position::zero());
-        node.add_input_pin("a", DataType::Typed("i64".into()));
-        node.add_input_pin("b", DataType::Typed("i64".into()));
-        node.add_output_pin("result", DataType::Typed("i64".into()));
+        node.add_input_pin("a", DataType::typed("i64"));
+        node.add_input_pin("b", DataType::typed("i64"));
+        node.add_output_pin("result", DataType::typed("i64"));
         node.set_property("b", i as f64);
         graph.add_node(node);
 
@@ -214,7 +214,7 @@ fn edge_node_type_not_in_provider() {
     let mut graph = GraphDescription::new("test");
 
     let mut node = NodeInstance::new("unknown_1", "unknown_type", Position::zero());
-    node.add_input_pin("x", DataType::Typed("i64".into()));
+    node.add_input_pin("x", DataType::typed("i64"));
     node.set_property("x", 42.0);
     graph.add_node(node);
 
@@ -241,17 +241,17 @@ fn edge_exec_only_graph() {
     let provider = TestMetadataProvider::comprehensive();
 
     let mut event = NodeInstance::new("start", "on_start", Position::zero());
-    event.add_output_pin("exec", DataType::Execution);
+    event.add_output_pin("exec", DataType::Exec);
     graph.add_node(event);
 
     let mut print1 = NodeInstance::new("p1", "print_string", Position::zero());
-    print1.add_input_pin("exec_in", DataType::Execution);
-    print1.add_output_pin("exec_out", DataType::Execution);
+    print1.add_input_pin("exec_in", DataType::Exec);
+    print1.add_output_pin("exec_out", DataType::Exec);
     graph.add_node(print1);
 
     let mut print2 = NodeInstance::new("p2", "print_string", Position::zero());
-    print2.add_input_pin("exec_in", DataType::Execution);
-    print2.add_output_pin("exec_out", DataType::Execution);
+    print2.add_input_pin("exec_in", DataType::Exec);
+    print2.add_output_pin("exec_out", DataType::Exec);
     graph.add_node(print2);
 
     graph.add_connection(Connection::execution("start", "exec", "p1", "exec_in"));
@@ -395,9 +395,9 @@ fn edge_parallel_single_node() {
     let provider = TestMetadataProvider::with_math_nodes();
 
     let mut node = NodeInstance::new("only", "add", Position::zero());
-    node.add_input_pin("a", DataType::Typed("i64".into()));
-    node.add_input_pin("b", DataType::Typed("i64".into()));
-    node.add_output_pin("result", DataType::Typed("i64".into()));
+    node.add_input_pin("a", DataType::typed("i64"));
+    node.add_input_pin("b", DataType::typed("i64"));
+    node.add_output_pin("result", DataType::typed("i64"));
     node.set_property("a", 1.0);
     node.set_property("b", 2.0);
     graph.add_node(node);
@@ -413,9 +413,9 @@ fn edge_parallel_wide_graph() {
 
     for i in 0..50 {
         let mut node = NodeInstance::new(format!("ind_{}", i), "add", Position::zero());
-        node.add_input_pin("a", DataType::Typed("i64".into()));
-        node.add_input_pin("b", DataType::Typed("i64".into()));
-        node.add_output_pin("result", DataType::Typed("i64".into()));
+        node.add_input_pin("a", DataType::typed("i64"));
+        node.add_input_pin("b", DataType::typed("i64"));
+        node.add_output_pin("result", DataType::typed("i64"));
         node.set_property("a", 1.0);
         node.set_property("b", 2.0);
         graph.add_node(node);

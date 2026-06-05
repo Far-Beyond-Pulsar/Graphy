@@ -119,11 +119,11 @@ mod tests {
 
         // Add nodes
         let mut node1 = NodeInstance::new("node1", "print", Position::zero());
-        node1.add_output_pin("exec_out", DataType::Execution);
+        node1.add_output_pin("exec_out", DataType::Exec);
         graph.add_node(node1);
 
         let mut node2 = NodeInstance::new("node2", "print", Position::zero());
-        node2.add_input_pin("exec_in", DataType::Execution);
+        node2.add_input_pin("exec_in", DataType::Exec);
         graph.add_node(node2);
 
         // Add execution connection

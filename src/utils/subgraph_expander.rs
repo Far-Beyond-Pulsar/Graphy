@@ -268,28 +268,28 @@ mod tests {
 
     fn make_add_node(id: &str) -> NodeInstance {
         let mut n = NodeInstance::new(id, "math.add", Position::zero());
-        n.add_input_pin("a", DataType::Number);
-        n.add_input_pin("b", DataType::Number);
-        n.add_output_pin("result", DataType::Number);
+        n.add_input_pin("a", DataType::typed("f64"));
+        n.add_input_pin("b", DataType::typed("f64"));
+        n.add_output_pin("result", DataType::typed("f64"));
         n
     }
 
     fn make_entry_node(id: &str) -> NodeInstance {
         let mut n = NodeInstance::new(id, "subgraph_entry", Position::zero());
-        n.add_output_pin("value", DataType::Number);
+        n.add_output_pin("value", DataType::typed("f64"));
         n
     }
 
     fn make_exit_node(id: &str) -> NodeInstance {
         let mut n = NodeInstance::new(id, "subgraph_exit", Position::zero());
-        n.add_input_pin("result", DataType::Number);
+        n.add_input_pin("result", DataType::typed("f64"));
         n
     }
 
     fn make_call_node(id: &str, subgraph_id: &str) -> NodeInstance {
         let mut n = NodeInstance::new(id, format!("macro:{}", subgraph_id), Position::zero());
-        n.add_input_pin("value", DataType::Number);
-        n.add_output_pin("result", DataType::Number);
+        n.add_input_pin("value", DataType::typed("f64"));
+        n.add_output_pin("result", DataType::typed("f64"));
         n
     }
 
@@ -307,11 +307,11 @@ mod tests {
         // Parent: source → call → sink
         let mut parent = GraphDescription::new("parent");
         let mut src = NodeInstance::new("src", "const", Position::zero());
-        src.add_output_pin("out", DataType::Number);
+        src.add_output_pin("out", DataType::typed("f64"));
         parent.add_node(src);
         parent.add_node(make_call_node("call1", "double"));
         let mut sink = NodeInstance::new("sink", "print", Position::zero());
-        sink.add_input_pin("in", DataType::Number);
+        sink.add_input_pin("in", DataType::typed("f64"));
         parent.add_node(sink);
 
         parent.add_connection(Connection::data("src", "out", "call1", "value"));

@@ -57,15 +57,15 @@ fn typeinfo_ne() {
 
 #[test]
 fn datatype_execution_variant() {
-    let dt = DataType::Execution;
-    assert_eq!(dt, DataType::Execution);
+    let dt = DataType::Exec;
+    assert_eq!(dt, DataType::Exec);
 }
 
 #[test]
 fn datatype_typed_variant() {
-    let dt = DataType::Typed("f64".into());
+    let dt = DataType::typed("f64");
     match &dt {
-        DataType::Typed(ti) => assert_eq!(ti.type_string, "f64"),
+        DataType::Data(ti) => assert_eq!(ti.type_string, "f64"),
         _ => panic!("expected Typed variant"),
     }
 }
@@ -73,13 +73,13 @@ fn datatype_typed_variant() {
 #[test]
 fn datatype_legacy_variants() {
     let variants = vec![
-        DataType::Number,
-        DataType::String,
-        DataType::Boolean,
-        DataType::Vector2,
-        DataType::Vector3,
-        DataType::Color,
-        DataType::Any,
+        DataType::typed("f64"),
+        DataType::typed("String"),
+        DataType::typed("bool"),
+        DataType::typed("(f32, f32)"),
+        DataType::typed("(f32, f32, f32)"),
+        DataType::typed("[f32; 4]"),
+        DataType::any(),
     ];
     // Each variant should be equal to itself
     for v in &variants {
@@ -89,13 +89,13 @@ fn datatype_legacy_variants() {
 
 #[test]
 fn datatype_ne_across_variants() {
-    assert_ne!(DataType::Number, DataType::Boolean);
-    assert_ne!(DataType::Execution, DataType::Any);
+    assert_ne!(DataType::typed("f64"), DataType::typed("bool"));
+    assert_ne!(DataType::Exec, DataType::any());
 }
 
 #[test]
 fn datatype_clone() {
-    let original = DataType::Typed("HashMap<String, i32>".into());
+    let original = DataType::typed("HashMap<String, i32>");
     let cloned = original.clone();
     assert_eq!(original, cloned);
 }

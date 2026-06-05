@@ -432,13 +432,13 @@ mod tests {
     fn make_graph() -> GraphDescription {
         let mut g = GraphDescription::new("test");
         let mut add = NodeInstance::new("add_1", "math.add", Position::zero());
-        add.add_input_pin("a", DataType::Number);
-        add.add_input_pin("b", DataType::Number);
-        add.add_output_pin("result", DataType::Number);
+        add.add_input_pin("a", DataType::typed("f64"));
+        add.add_input_pin("b", DataType::typed("f64"));
+        add.add_output_pin("result", DataType::typed("f64"));
         g.add_node(add);
 
         let mut print = NodeInstance::new("print_1", "print", Position::zero());
-        print.add_input_pin("value", DataType::Number);
+        print.add_input_pin("value", DataType::typed("f64"));
         g.add_node(print);
 
         g.add_connection(Connection::data("add_1", "result", "print_1", "value"));

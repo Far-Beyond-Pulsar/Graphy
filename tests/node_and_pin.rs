@@ -24,36 +24,36 @@ fn pintype_copy() {
 
 #[test]
 fn pin_new() {
-    let pin = Pin::new("my_pin", "My Pin", DataType::Number, PinType::Input);
+    let pin = Pin::new("my_pin", "My Pin", DataType::typed("f64"), PinType::Input);
     assert_eq!(pin.id, "my_pin");
     assert_eq!(pin.name, "My Pin");
-    assert_eq!(pin.data_type, DataType::Number);
+    assert_eq!(pin.data_type, DataType::typed("f64"));
     assert_eq!(pin.pin_type, PinType::Input);
 }
 
 #[test]
 fn pin_typed_data() {
-    let pin = Pin::new("result", "Result", DataType::Typed("Vec<f64>".into()), PinType::Output);
+    let pin = Pin::new("result", "Result", DataType::typed("Vec<f64>"), PinType::Output);
     assert_eq!(pin.pin_type, PinType::Output);
     match &pin.data_type {
-        DataType::Typed(ti) => assert_eq!(ti.type_string, "Vec<f64>"),
+        DataType::Data(ti) => assert_eq!(ti.type_string, "Vec<f64>"),
         _ => panic!("expected Typed"),
     }
 }
 
 #[test]
 fn pin_execution_type() {
-    let pin = Pin::new("exec", "Exec", DataType::Execution, PinType::Input);
-    assert_eq!(pin.data_type, DataType::Execution);
+    let pin = Pin::new("exec", "Exec", DataType::Exec, PinType::Input);
+    assert_eq!(pin.data_type, DataType::Exec);
 }
 
 #[test]
 fn pin_clone() {
-    let original = Pin::new("a", "A", DataType::Boolean, PinType::Input);
+    let original = Pin::new("a", "A", DataType::typed("bool"), PinType::Input);
     let cloned = original.clone();
     assert_eq!(cloned.id, "a");
     assert_eq!(cloned.name, "A");
-    assert_eq!(cloned.data_type, DataType::Boolean);
+    assert_eq!(cloned.data_type, DataType::typed("bool"));
 }
 
 // ===========================================================================
@@ -62,7 +62,7 @@ fn pin_clone() {
 
 #[test]
 fn pin_instance_new() {
-    let pin = Pin::new("x", "X", DataType::Number, PinType::Input);
+    let pin = Pin::new("x", "X", DataType::typed("f64"), PinType::Input);
     let instance = PinInstance::new("x", pin);
     assert_eq!(instance.id, "x");
     assert_eq!(instance.pin.name, "X");
@@ -70,7 +70,7 @@ fn pin_instance_new() {
 
 #[test]
 fn pin_instance_clone() {
-    let pin = Pin::new("y", "Y", DataType::String, PinType::Output);
+    let pin = Pin::new("y", "Y", DataType::typed("String"), PinType::Output);
     let instance = PinInstance::new("y", pin);
     let cloned = instance.clone();
     assert_eq!(cloned.id, "y");
@@ -108,8 +108,8 @@ fn node_new_with_string_args() {
 #[test]
 fn node_add_input_pin() {
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.add_input_pin("a", DataType::Typed("i64".into()));
-    node.add_input_pin("b", DataType::Typed("i64".into()));
+    node.add_input_pin("a", DataType::typed("i64"));
+    node.add_input_pin("b", DataType::typed("i64"));
 
     assert_eq!(node.inputs.len(), 2);
     assert_eq!(node.inputs[0].id, "a");
@@ -120,7 +120,7 @@ fn node_add_input_pin() {
 #[test]
 fn node_add_output_pin() {
     let mut node = NodeInstance::new("n", "add", Position::zero());
-    node.add_output_pin("result", DataType::Typed("i64".into()));
+    node.add_output_pin("result", DataType::typed("i64"));
 
     assert_eq!(node.outputs.len(), 1);
     assert_eq!(node.outputs[0].id, "result");
@@ -130,22 +130,22 @@ fn node_add_output_pin() {
 #[test]
 fn node_add_execution_pins() {
     let mut node = NodeInstance::new("n", "print", Position::zero());
-    node.add_input_pin("exec_in", DataType::Execution);
-    node.add_output_pin("exec_out", DataType::Execution);
+    node.add_input_pin("exec_in", DataType::Exec);
+    node.add_output_pin("exec_out", DataType::Exec);
 
     assert_eq!(node.inputs.len(), 1);
     assert_eq!(node.outputs.len(), 1);
-    assert_eq!(node.inputs[0].pin.data_type, DataType::Execution);
-    assert_eq!(node.outputs[0].pin.data_type, DataType::Execution);
+    assert_eq!(node.inputs[0].pin.data_type, DataType::Exec);
+    assert_eq!(node.outputs[0].pin.data_type, DataType::Exec);
 }
 
 #[test]
 fn node_mixed_pins() {
     let mut node = NodeInstance::new("branch", "branch", Position::zero());
-    node.add_input_pin("exec_in", DataType::Execution);
-    node.add_input_pin("condition", DataType::Typed("bool".into()));
-    node.add_output_pin("True", DataType::Execution);
-    node.add_output_pin("False", DataType::Execution);
+    node.add_input_pin("exec_in", DataType::Exec);
+    node.add_input_pin("condition", DataType::typed("bool"));
+    node.add_output_pin("True", DataType::Exec);
+    node.add_output_pin("False", DataType::Exec);
 
     assert_eq!(node.inputs.len(), 2);
     assert_eq!(node.outputs.len(), 2);
@@ -200,8 +200,8 @@ fn node_multiple_property_types() {
 #[test]
 fn node_clone_preserves_all_data() {
     let mut node = NodeInstance::new("original", "add", Position::new(5.0, 10.0));
-    node.add_input_pin("a", DataType::Typed("i64".into()));
-    node.add_output_pin("result", DataType::Typed("i64".into()));
+    node.add_input_pin("a", DataType::typed("i64"));
+    node.add_output_pin("result", DataType::typed("i64"));
     node.set_property("a", 7.0);
 
     let cloned = node.clone();

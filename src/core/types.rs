@@ -2,23 +2,26 @@
 //!
 //! Data types and type information for node pins and values.
 //!
-//! The type system has two layers:
+//! ## Pin types — `DataType`
 //!
-//! - **`TypeInfo`** — the legacy string-based type (retained for serialization compatibility).
-//!   All existing serialized graphs continue to deserialize unchanged.
+//! Every pin carries exactly one of two variants:
 //!
-//! - **`ReflectedType`** — the rich structured type introduced in v2. Represents the full
-//!   Rust type algebra: primitives, structs, enums, generics, wrappers, tuples, arrays, and
-//!   wildcards. `TypeInfo::parse()` converts a stored string into a `ReflectedType`; conversely
-//!   `ReflectedType::to_type_string()` round-trips back to a string for code emission.
+//! - `DataType::Exec` — execution-flow pin (control flow, no value).
+//! - `DataType::Data(TypeInfo)` — data pin. `TypeInfo` carries the Rust type
+//!   string plus optional display metadata (human name, byte size, alignment).
+//!   The runtime does not hard-code knowledge of any specific type; callers
+//!   supply all domain-specific types through `TypeInfo`.
 //!
-//! - **`PropertyValue`** — typed constant storage for node properties, replacing the opaque
-//!   `serde_json::Value` bag. Old JSON properties can be migrated via `PropertyValue::from_json`.
+//! ## Structural types — `ReflectedType`
 //!
-//! ## Compatibility
+//! `TypeInfo::parse()` converts a stored type string into a `ReflectedType`,
+//! the full Rust type algebra (primitives, structs, enums, generics, wrappers,
+//! tuples, arrays, wildcards). `ReflectedType::to_type_string()` round-trips
+//! back to a string for code emission.
 //!
-//! `DataType::Typed(TypeInfo)` serializes identically to previous versions. New code that
-//! requires structured type information calls `DataType::reflect()` or `TypeInfo::parse()`.
+//! ## Property values — `PropertyValue`
+//!
+//! Typed constant storage for node properties.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,139 +31,85 @@ use std::str::FromStr;
 pub type JsonValue = serde_json::Value;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Legacy / Compatibility Layer
+// TypeInfo
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Data type for a pin.
+/// Type descriptor for a data pin.
 ///
-/// Supports both legacy enum variants for backward compatibility and modern
-/// typed variants using Rust type strings.
+/// Carries a Rust type string plus optional runtime reflection metadata
+/// (human-readable name, byte size, byte alignment). The Pulsar reflection
+/// system can populate `size_bytes` and `align_bytes` from `TypeLayout`;
+/// code that only needs type-checking can leave them `None`.
 ///
-/// For rich structural type information use [`DataType::reflect()`] which
-/// parses the inner [`TypeInfo`] into a [`ReflectedType`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DataType {
-    /// Execution flow pin — carries control flow, no data value.
-    Execution,
-
-    /// Modern typed data pin with an explicit Rust type string.
-    Typed(TypeInfo),
-
-    // ── Legacy variants ────────────────────────────────────────────────────
-    /// Numeric value (`f64`). Legacy — use `Typed(TypeInfo::new("f64"))`.
-    Number,
-    /// String value. Legacy — use `Typed(TypeInfo::new("String"))`.
-    String,
-    /// Boolean value. Legacy — use `Typed(TypeInfo::new("bool"))`.
-    Boolean,
-    /// 2D vector. Legacy — use `Typed(TypeInfo::new("(f32, f32)"))`.
-    Vector2,
-    /// 3D vector. Legacy — use `Typed(TypeInfo::new("(f32, f32, f32)"))`.
-    Vector3,
-    /// RGBA colour. Legacy — use `Typed(TypeInfo::new("[f32; 4]"))`.
-    Color,
-    /// Wildcard — accepts any data type.
-    Any,
-}
-
-impl DataType {
-    /// Returns `true` if this is an execution-flow pin.
-    #[inline]
-    pub fn is_execution(&self) -> bool {
-        matches!(self, DataType::Execution)
-    }
-
-    /// Returns `true` if this is a data-carrying pin (any typed variant).
-    #[inline]
-    pub fn is_data(&self) -> bool {
-        !self.is_execution()
-    }
-
-    /// Attempts to parse this data type into a [`ReflectedType`].
-    ///
-    /// Legacy enum variants are mapped to their canonical `ReflectedType`
-    /// equivalents. `DataType::Any` maps to `ReflectedType::Wildcard`.
-    ///
-    /// Returns `None` for `DataType::Execution`.
-    pub fn reflect(&self) -> Option<ReflectedType> {
-        match self {
-            DataType::Execution => None,
-            DataType::Typed(ti) => Some(ti.parse()),
-            DataType::Number => Some(ReflectedType::Primitive(PrimitiveKind::F64)),
-            DataType::String => Some(ReflectedType::Primitive(PrimitiveKind::StringOwned)),
-            DataType::Boolean => Some(ReflectedType::Primitive(PrimitiveKind::Bool)),
-            DataType::Vector2 => Some(ReflectedType::Tuple(vec![
-                ReflectedType::Primitive(PrimitiveKind::F32),
-                ReflectedType::Primitive(PrimitiveKind::F32),
-            ])),
-            DataType::Vector3 => Some(ReflectedType::Tuple(vec![
-                ReflectedType::Primitive(PrimitiveKind::F32),
-                ReflectedType::Primitive(PrimitiveKind::F32),
-                ReflectedType::Primitive(PrimitiveKind::F32),
-            ])),
-            DataType::Color => Some(ReflectedType::Array {
-                element: Box::new(ReflectedType::Primitive(PrimitiveKind::F32)),
-                len: Some(4),
-            }),
-            DataType::Any => Some(ReflectedType::Wildcard),
-        }
-    }
-
-    /// Constructs a `DataType::Typed` from a [`ReflectedType`].
-    pub fn from_reflected(rt: &ReflectedType) -> Self {
-        DataType::Typed(TypeInfo::new(rt.to_type_string()))
-    }
-
-    /// Returns the canonical type string for this data type, or `None` for execution pins.
-    pub fn type_string(&self) -> Option<std::borrow::Cow<'_, str>> {
-        match self {
-            DataType::Execution => None,
-            DataType::Typed(ti) => Some(std::borrow::Cow::Borrowed(&ti.type_string)),
-            DataType::Number => Some(std::borrow::Cow::Borrowed("f64")),
-            DataType::String => Some(std::borrow::Cow::Borrowed("String")),
-            DataType::Boolean => Some(std::borrow::Cow::Borrowed("bool")),
-            DataType::Vector2 => Some(std::borrow::Cow::Borrowed("(f32, f32)")),
-            DataType::Vector3 => Some(std::borrow::Cow::Borrowed("(f32, f32, f32)")),
-            DataType::Color => Some(std::borrow::Cow::Borrowed("[f32; 4]")),
-            DataType::Any => Some(std::borrow::Cow::Borrowed("?")),
-        }
-    }
-}
-
-/// Type information for typed pins — thin wrapper around a Rust type string.
+/// # Constructing
 ///
-/// This type is retained for serialization compatibility with v1 graphs.
-/// For structural type analysis use [`TypeInfo::parse()`] to obtain a
-/// [`ReflectedType`].
+/// ```
+/// use graphy::TypeInfo;
+///
+/// // Minimal — type string only
+/// let ti = TypeInfo::new("Vec2");
+///
+/// // With display metadata
+/// let ti = TypeInfo::new("Vec2")
+///     .with_display_name("Vector 2D")
+///     .with_layout(8, 4);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TypeInfo {
-    /// Rust type string, e.g. `"i64"`, `"String"`, `"Vec<Option<f32>>"`.
+    /// Rust type string, e.g. `"i64"`, `"Vec2"`, `"Vec<Option<f32>>"`.
     pub type_string: String,
+
+    /// Human-readable display name shown in the editor (e.g. `"Vector 2D"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+
+    /// Byte size of this type at runtime (`std::mem::size_of`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<usize>,
+
+    /// Byte alignment of this type at runtime (`std::mem::align_of`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub align_bytes: Option<usize>,
 }
 
 impl TypeInfo {
-    /// Creates a new `TypeInfo` from a type string.
-    #[inline(always)]
+    /// Creates a `TypeInfo` from a Rust type string, no display metadata.
+    #[inline]
     #[must_use]
     pub fn new(type_string: impl Into<String>) -> Self {
-        Self { type_string: type_string.into() }
+        Self {
+            type_string: type_string.into(),
+            display_name: None,
+            size_bytes: None,
+            align_bytes: None,
+        }
+    }
+
+    /// Builder: set a human-readable display name.
+    #[inline]
+    #[must_use]
+    pub fn with_display_name(mut self, name: impl Into<String>) -> Self {
+        self.display_name = Some(name.into());
+        self
+    }
+
+    /// Builder: set byte size and alignment (from Pulsar's `TypeLayout` or `std::mem`).
+    #[inline]
+    #[must_use]
+    pub fn with_layout(mut self, size_bytes: usize, align_bytes: usize) -> Self {
+        self.size_bytes = Some(size_bytes);
+        self.align_bytes = Some(align_bytes);
+        self
+    }
+
+    /// Returns the display name if set, otherwise the type string.
+    #[inline]
+    pub fn label(&self) -> &str {
+        self.display_name.as_deref().unwrap_or(&self.type_string)
     }
 
     /// Parses the type string into a structured [`ReflectedType`].
-    ///
-    /// Parsing is best-effort: unknown or complex types that cannot be fully
-    /// parsed fall back to `ReflectedType::Struct { path, generics: [] }`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use graphy::core::TypeInfo;
-    /// use graphy::core::ReflectedType;
-    ///
-    /// let ti = TypeInfo::new("Vec<f32>");
-    /// let rt = ti.parse();
-    /// // rt is ReflectedType::Wrapper { kind: WrapperKind::Vec, inner: Box<Primitive(F32)> }
-    /// ```
+    #[inline]
     pub fn parse(&self) -> ReflectedType {
         ReflectedType::parse_str(&self.type_string)
     }
@@ -173,18 +122,103 @@ impl fmt::Display for TypeInfo {
 }
 
 impl From<&str> for TypeInfo {
-    #[inline(always)]
+    #[inline]
     fn from(s: &str) -> Self { Self::new(s) }
 }
 
 impl From<String> for TypeInfo {
-    #[inline(always)]
+    #[inline]
     fn from(s: String) -> Self { Self::new(s) }
 }
 
 impl From<&ReflectedType> for TypeInfo {
     fn from(rt: &ReflectedType) -> Self {
         TypeInfo::new(rt.to_type_string())
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DataType
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Pin type — exactly two variants, no domain-specific knowledge baked in.
+///
+/// - `Exec` — execution-flow pin (control flow, no value).
+/// - `Data(TypeInfo)` — data pin carrying any Rust type. The runtime has no
+///   internal knowledge of specific types; every type is represented uniformly
+///   through `TypeInfo { type_string, display_name, size_bytes, align_bytes }`.
+///
+/// This design means the graph library is infinitely extensible: adding new
+/// types (e.g. `Vec2`, `Transform`, `AssetHandle<Mesh>`) requires no changes
+/// to Graphy — callers construct a `TypeInfo` and wrap it in `DataType::Data`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DataType {
+    /// Execution-flow pin — carries control flow, holds no data value.
+    Exec,
+    /// Data pin — carries a value of the type described by `TypeInfo`.
+    Data(TypeInfo),
+}
+
+impl DataType {
+    // ── Convenience constructors ─────────────────────────────────────────────
+
+    /// Creates a data pin from a Rust type string.
+    #[inline]
+    pub fn typed(type_string: impl Into<String>) -> Self {
+        DataType::Data(TypeInfo::new(type_string))
+    }
+
+    /// Creates a wildcard data pin (accepts any type).
+    #[inline]
+    pub fn any() -> Self {
+        DataType::Data(TypeInfo::new("?"))
+    }
+
+    // ── Queries ──────────────────────────────────────────────────────────────
+
+    /// Returns `true` if this is an execution-flow pin.
+    #[inline]
+    pub fn is_execution(&self) -> bool {
+        matches!(self, DataType::Exec)
+    }
+
+    /// Returns `true` if this is a data-carrying pin.
+    #[inline]
+    pub fn is_data(&self) -> bool {
+        matches!(self, DataType::Data(_))
+    }
+
+    /// Returns the inner `TypeInfo`, or `None` for `Exec` pins.
+    #[inline]
+    pub fn type_info(&self) -> Option<&TypeInfo> {
+        match self {
+            DataType::Data(ti) => Some(ti),
+            DataType::Exec => None,
+        }
+    }
+
+    /// Parses this pin's type into a [`ReflectedType`], or `None` for `Exec`.
+    #[inline]
+    pub fn reflect(&self) -> Option<ReflectedType> {
+        match self {
+            DataType::Exec => None,
+            DataType::Data(ti) => Some(ti.parse()),
+        }
+    }
+
+    /// Returns the canonical type string, or `None` for `Exec` pins.
+    #[inline]
+    pub fn type_string(&self) -> Option<&str> {
+        match self {
+            DataType::Exec => None,
+            DataType::Data(ti) => Some(&ti.type_string),
+        }
+    }
+
+    /// Constructs a `DataType::Data` from a [`ReflectedType`].
+    #[inline]
+    pub fn from_reflected(rt: &ReflectedType) -> Self {
+        DataType::Data(TypeInfo::new(rt.to_type_string()))
     }
 }
 
@@ -1048,9 +1082,9 @@ mod tests {
 
     #[test]
     fn datatype_reflect() {
-        assert!(DataType::Number.reflect().unwrap().is_numeric());
-        assert!(matches!(DataType::Any.reflect().unwrap(), ReflectedType::Wildcard));
-        assert!(DataType::Execution.reflect().is_none());
+        assert!(DataType::typed("f64").reflect().unwrap().is_numeric());
+        assert!(matches!(DataType::any().reflect().unwrap(), ReflectedType::Wildcard));
+        assert!(DataType::Exec.reflect().is_none());
     }
 
     #[test]

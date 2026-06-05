@@ -387,8 +387,8 @@ mod tests {
     #[test]
     fn id_prefix() {
         let mut node = NodeInstance::new("node1", "add", Position::zero());
-        node.add_input_pin("a", DataType::Number);
-        node.add_output_pin("result", DataType::Number);
+        node.add_input_pin("a", DataType::typed("f64"));
+        node.add_output_pin("result", DataType::typed("f64"));
         let prefixed = node.with_id_prefix("scope_");
         assert_eq!(prefixed.id, "scope_node1");
         assert_eq!(prefixed.inputs[0].id, "scope_a");

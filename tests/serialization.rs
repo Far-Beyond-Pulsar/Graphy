@@ -7,35 +7,31 @@ use graphy::*;
 // ===========================================================================
 
 #[test]
-fn serde_datatype_execution() {
-    let dt = DataType::Execution;
+fn serde_datatype_exec() {
+    let dt = DataType::Exec;
     let json = serde_json::to_string(&dt).unwrap();
     let deserialized: DataType = serde_json::from_str(&json).unwrap();
-    assert_eq!(deserialized, DataType::Execution);
+    assert_eq!(deserialized, DataType::Exec);
 }
 
 #[test]
-fn serde_datatype_typed() {
-    let dt = DataType::Typed("Vec<f64>".into());
+fn serde_datatype_data() {
+    let dt = DataType::typed("Vec<f64>");
     let json = serde_json::to_string(&dt).unwrap();
     let deserialized: DataType = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, dt);
 }
 
 #[test]
-fn serde_datatype_all_legacy_variants() {
-    for dt in [
-        DataType::Number,
-        DataType::String,
-        DataType::Boolean,
-        DataType::Vector2,
-        DataType::Vector3,
-        DataType::Color,
-        DataType::Any,
-    ] {
-        let json = serde_json::to_string(&dt).unwrap();
-        let deserialized: DataType = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized, dt);
+fn serde_datatype_data_with_metadata() {
+    let dt = DataType::Data(TypeInfo::new("Vec2").with_display_name("Vector 2D").with_layout(8, 4));
+    let json = serde_json::to_string(&dt).unwrap();
+    let deserialized: DataType = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, dt);
+    if let DataType::Data(ti) = &deserialized {
+        assert_eq!(ti.display_name.as_deref(), Some("Vector 2D"));
+        assert_eq!(ti.size_bytes, Some(8));
+        assert_eq!(ti.align_bytes, Some(4));
     }
 }
 
@@ -173,8 +169,8 @@ fn serde_connection_execution() {
 #[test]
 fn serde_node_instance_basic() {
     let mut node = NodeInstance::new("node_1", "add", Position::new(10.0, 20.0));
-    node.add_input_pin("a", DataType::Typed("i64".into()));
-    node.add_output_pin("result", DataType::Typed("i64".into()));
+    node.add_input_pin("a", DataType::typed("i64"));
+    node.add_output_pin("result", DataType::typed("i64"));
     node.set_property("a", 5.0);
 
     let json = serde_json::to_string(&node).unwrap();
@@ -199,17 +195,17 @@ fn serde_full_graph_round_trip() {
 
     // Add nodes
     let mut n1 = NodeInstance::new("add_1", "add", Position::new(0.0, 0.0));
-    n1.add_input_pin("a", DataType::Typed("i64".into()));
-    n1.add_input_pin("b", DataType::Typed("i64".into()));
-    n1.add_output_pin("result", DataType::Typed("i64".into()));
+    n1.add_input_pin("a", DataType::typed("i64"));
+    n1.add_input_pin("b", DataType::typed("i64"));
+    n1.add_output_pin("result", DataType::typed("i64"));
     n1.set_property("a", 10.0);
     n1.set_property("b", 20.0);
     graph.add_node(n1);
 
     let mut n2 = NodeInstance::new("print_1", "print", Position::new(200.0, 0.0));
-    n2.add_input_pin("exec_in", DataType::Execution);
-    n2.add_input_pin("message", DataType::Typed("String".into()));
-    n2.add_output_pin("exec_out", DataType::Execution);
+    n2.add_input_pin("exec_in", DataType::Exec);
+    n2.add_input_pin("message", DataType::typed("String"));
+    n2.add_output_pin("exec_out", DataType::Exec);
     n2.set_property("message", "hello");
     graph.add_node(n2);
 
@@ -301,8 +297,8 @@ fn serde_large_graph() {
 
     for i in 0..100 {
         let mut node = NodeInstance::new(format!("n_{}", i), "add", Position::new(i as f64, 0.0));
-        node.add_input_pin("a", DataType::Typed("i64".into()));
-        node.add_output_pin("result", DataType::Typed("i64".into()));
+        node.add_input_pin("a", DataType::typed("i64"));
+        node.add_output_pin("result", DataType::typed("i64"));
         node.set_property("a", i as f64);
         graph.add_node(node);
     }
