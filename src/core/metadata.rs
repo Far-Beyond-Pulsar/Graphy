@@ -1,4 +1,4 @@
-﻿//! # Node Metadata
+//! # Node Metadata
 //!
 //! Metadata structures and traits describing node type interfaces.
 //!
