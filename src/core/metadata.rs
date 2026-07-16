@@ -1,4 +1,4 @@
-//! # Node Metadata
+﻿//! # Node Metadata
 //!
 //! Metadata structures and traits describing node type interfaces.
 //!
@@ -179,6 +179,14 @@ pub struct NodeMetadata {
     /// signature changes to allow editors to flag stale node instances.
     #[serde(default)]
     pub metadata_version: u32,
+
+    /// Named module-scope helper function definitions required by
+    /// `function_source`, as `(name, wgsl_source)` pairs. Emitted once per
+    /// generated module (deduplicated by name across nodes) by shader
+    /// codegen; ignored by blueprint codegen. List helpers dependency-first
+    /// within a node.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub helper_functions: Vec<(String, String)>,
 }
 
 impl NodeMetadata {
@@ -206,6 +214,7 @@ impl NodeMetadata {
             doc: None,
             deprecated: None,
             metadata_version: 0,
+            helper_functions: Vec::new(),
         }
     }
 
@@ -307,6 +316,17 @@ impl NodeMetadata {
         self
     }
 
+    /// Sets named module-scope helper functions required by `function_source`.
+    #[inline]
+    #[must_use]
+    pub fn with_helpers(mut self, helpers: &[(&str, &str)]) -> Self {
+        self.helper_functions = helpers
+            .iter()
+            .map(|(name, source)| ((*name).to_string(), (*source).to_string()))
+            .collect();
+        self
+    }
+
     // ── Accessors ─────────────────────────────────────────────────────────────
 
     /// Returns the rich [`ParamMeta`] list if available, otherwise synthesizes
@@ -375,4 +395,37 @@ pub trait NodeMetadataProvider {
 
     /// Returns all node types in the given category.
     fn get_nodes_by_category(&self, category: &str) -> Vec<&NodeMetadata>;
+}
+
+#[cfg(test)]
+mod helper_function_tests {
+    use super::*;
+
+    #[test]
+    fn with_helpers_stores_named_sources() {
+        let meta = NodeMetadata::new("perlin_2d", NodeTypes::pure, "Noise")
+            .with_helpers(&[("pn_hash21", "fn pn_hash21() {}"), ("pn_perlin", "fn pn_perlin() {}")]);
+        assert_eq!(meta.helper_functions.len(), 2);
+        assert_eq!(meta.helper_functions[0].0, "pn_hash21");
+        assert_eq!(meta.helper_functions[1].1, "fn pn_perlin() {}");
+    }
+
+    #[test]
+    fn helper_functions_default_empty_from_legacy_json() {
+        // Serialized metadata written before this field existed must load.
+        let meta = NodeMetadata::new("add", NodeTypes::pure, "Math");
+        let mut json: serde_json::Value = serde_json::to_value(&meta).unwrap();
+        json.as_object_mut().unwrap().remove("helper_functions");
+        let restored: NodeMetadata = serde_json::from_value(json).unwrap();
+        assert!(restored.helper_functions.is_empty());
+    }
+
+    #[test]
+    fn helper_functions_round_trip_serde() {
+        let meta = NodeMetadata::new("perlin_2d", NodeTypes::pure, "Noise")
+            .with_helpers(&[("pn_hash21", "fn pn_hash21() {}")]);
+        let json = serde_json::to_string(&meta).unwrap();
+        let restored: NodeMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.helper_functions, meta.helper_functions);
+    }
 }
