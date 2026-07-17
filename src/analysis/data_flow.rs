@@ -154,6 +154,7 @@ impl DataResolver {
 
         // Phase 1: Map all data connections
         resolver.map_data_connections(graph)?;
+        resolver.resolve_reroute_passthrough(graph);
         compiler_debug("data_flow", "Mapped data connections");
 
         // Phase 2: Generate variable names for node results
@@ -254,6 +255,9 @@ impl DataResolver {
             // Phase 1: Map all data connections (parallel)
             resolver.map_data_connections_parallel(graph)?;
 
+            // Phase 1b: Resolve reroute pass-through (sequential — fast)
+            resolver.resolve_reroute_passthrough(graph);
+
             // Phase 2: Generate variable names (parallel)
             resolver.generate_variable_names_parallel(graph);
 
@@ -317,6 +321,46 @@ impl DataResolver {
         );
 
         Ok(())
+    }
+
+    /// Walk through reroute ("reroute") nodes and make them transparent to
+    /// the data-flow analysis: a connection A→reroute(input) is re-routed so
+    /// that any consumer of reroute(output) sees A directly, as if the
+    /// reroute were never there.
+    fn resolve_reroute_passthrough(&mut self, graph: &GraphDescription) {
+        // Collect all reroute node IDs first to avoid borrow issues.
+        let reroute_ids: Vec<String> = graph
+            .nodes
+            .iter()
+            .filter(|(_, n)| n.node_type == "reroute")
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        for rid in &reroute_ids {
+            // What feeds into this reroute's "input" pin?
+            let input_src = match self.input_sources.get(&(rid.clone(), "input".to_string())) {
+                Some(src) => src.clone(),
+                None => continue,
+            };
+
+            // For every connection FROM this reroute's "output" pin, replace
+            // the consumer's input source with the reroute's input source.
+            let to_replace: Vec<(String, String)> = graph
+                .connections
+                .iter()
+                .filter(|c| {
+                    c.connection_type == ConnectionType::Data
+                        && c.source_node == *rid
+                        && c.source_pin == "output"
+                })
+                .map(|c| (c.target_node.clone(), c.target_pin.clone()))
+                .collect();
+
+            for (target_node, target_pin) in &to_replace {
+                self.input_sources
+                    .insert((target_node.clone(), target_pin.clone()), input_src.clone());
+            }
+        }
     }
 
     /// Generate unique variable names for each node's result
