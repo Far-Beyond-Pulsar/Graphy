@@ -97,6 +97,60 @@ impl ParamMeta {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OutputParam — describes a single named output pin
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Describes a named output pin on a node.  Each output pin carries an
+/// **accessor** string that the codegen appends to the node's `let` variable
+/// to reach the field, e.g. `".r"`, `"[0]"`, or `""` (the empty string means
+/// the whole variable — the default single-output case).
+///
+/// # Why not just multiple return types?
+///
+/// WGSL (and most GPU languages) lack multi-return functions.  A node with
+/// multiple outputs emits a **single `let` binding** whose type contains all
+/// values (a struct or vector), and each output pin's `accessor` lets
+/// downstream nodes reach the specific field they need.
+///
+/// ```rust
+/// use graphy::{NodeMetadata, NodeTypes, ParamInfo, OutputParam};
+///
+/// let meta = NodeMetadata::new("break_vec4", NodeTypes::pure, "Vector")
+///     .with_params(vec![ParamInfo::new("v", "vec4<f32>")])
+///     .with_return_type("vec4<f32>")
+///     .with_source("v")           // emits: let N_result = v;
+///     .with_outputs(vec![
+///         OutputParam::new("r", "f32", ".r"),
+///         OutputParam::new("g", "f32", ".g"),
+///         OutputParam::new("b", "f32", ".b"),
+///         OutputParam::new("a", "f32", ".a"),
+///     ]);
+/// // Consumer of `r` resolves to `N_result.r`
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutputParam {
+    /// Pin identifier (e.g. `"r"`, `"g"`, `"result"`).
+    pub name: String,
+
+    /// WGSL type string (e.g. `"f32"`, `"vec3<f32>"`).
+    pub param_type: String,
+
+    /// Field/swizzle path relative to the node's result variable.
+    /// Empty string means the whole variable (default single output).
+    pub accessor: String,
+}
+
+impl OutputParam {
+    pub fn new(name: impl Into<String>, param_type: impl Into<String>, accessor: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            param_type: param_type.into(),
+            accessor: accessor.into(),
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ConversionInfo — declares that this node converts one type to another
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -236,6 +290,13 @@ pub struct NodeMetadata {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub helper_functions: Vec<(String, String)>,
 
+    /// Named output pins.  If non-empty the codegen emits a single `let` and
+    /// appends each pin's `accessor` at the consumer site (see [`OutputParam`]).
+    /// When empty (the default) a single `"result"` pin is synthesised from
+    /// [`return_type`](Self::return_type).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub output_params: Vec<OutputParam>,
+
     /// If `Some`, this node performs an explicit type conversion from
     /// `conversion.from_type` to `conversion.to_type`.  The compiler uses
     /// this to auto-insert conversion nodes when connecting mismatched
@@ -270,6 +331,7 @@ impl NodeMetadata {
             deprecated: None,
             metadata_version: 0,
             helper_functions: Vec::new(),
+            output_params: Vec::new(),
             conversion: None,
         }
     }
@@ -383,6 +445,14 @@ impl NodeMetadata {
         self
     }
 
+    /// Sets named output pins for multi-output nodes (Break, etc.).
+    #[inline]
+    #[must_use]
+    pub fn with_outputs(mut self, outputs: Vec<OutputParam>) -> Self {
+        self.output_params = outputs;
+        self
+    }
+
     /// Declares that this node converts `from_type` → `to_type`.
     ///
     /// The compiler auto-inserts conversion nodes when connecting
@@ -403,6 +473,20 @@ impl NodeMetadata {
             self.param_metas.clone()
         } else {
             self.params.iter().map(|p| p.to_param_meta()).collect()
+        }
+    }
+
+    /// Returns the output pins for this node:
+    ///
+    /// - If `output_params` is non-empty it is returned directly.
+    /// - Otherwise a single `"result"` pin is synthesised from `return_type`.
+    pub fn effective_outputs(&self) -> Vec<OutputParam> {
+        if !self.output_params.is_empty() {
+            self.output_params.clone()
+        } else if let Some(rt) = &self.return_type {
+            vec![OutputParam::new("result", rt.type_string.clone(), "")]
+        } else {
+            Vec::new()
         }
     }
 

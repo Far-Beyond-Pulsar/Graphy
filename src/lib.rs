@@ -80,6 +80,8 @@ pub use core::{
     // v2 types
     NodeKind, PropertyValue, PropertySchema, ReflectedType, PrimitiveKind,
     ParamMeta,
+    // output metadata
+    OutputParam,
     // conversion metadata
     ConversionInfo,
     // document model
