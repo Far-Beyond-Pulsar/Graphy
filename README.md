@@ -26,6 +26,7 @@ Whether you're building a visual scripting system, shader graph editor, or compu
 
 - 🔄 **Multi-Phase Compilation** - Graph expansion, data flow analysis, execution routing, and code generation
 - 🎨 **Target-Agnostic** - Support Rust, WGSL, or implement your own code generator
+- 🔌 **Multi-Output Nodes** - Break a vector into components or combine scalars into a compound value through a single `let` binding with zero-cost field accessors
 - 🧩 **Extensible Architecture** - Trait-based design for custom nodes and languages
 - 📊 **Smart Analysis** - Topological sorting, cycle detection, and dependency resolution
 - ⚡ **Parallel Processing** - Multi-threaded analysis with Rayon for large graphs (1.5x speedup at 6400+ nodes)
@@ -291,6 +292,27 @@ pub enum ConnectionType {
     Execution,
 }
 ```
+
+#### Multi-Output Nodes
+
+A node can expose multiple named output pins through `OutputParam`. Each pin carries a field **accessor** string that the codegen appends at the consumer site — the node itself emits a single `let` binding:
+
+```rust
+use graphy::{NodeMetadata, NodeTypes, ParamInfo, OutputParam};
+
+let break_vec4 = NodeMetadata::new("break_vec4", NodeTypes::pure, "Vector")
+    .with_params(vec![ParamInfo::new("v", "vec4<f32>")])
+    .with_return_type("vec4<f32>")
+    .with_source("v")                          // let N = v;
+    .with_outputs(vec![
+        OutputParam::new("r", "f32", ".r"),    // consumer writes N.r
+        OutputParam::new("g", "f32", ".g"),    // consumer writes N.g
+        OutputParam::new("b", "f32", ".b"),
+        OutputParam::new("a", "f32", ".a"),
+    ]);
+```
+
+When `output_params` is empty (the default) a single `"result"` pin is synthesised from `return_type`, preserving full backward compatibility with existing nodes.
 
 ### Analysis Phase
 
