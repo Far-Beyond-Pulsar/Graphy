@@ -194,4 +194,24 @@ impl GraphDescription {
     pub fn get_node_mut(&mut self, id: &str) -> Option<&mut NodeInstance> {
         self.nodes.get_mut(id)
     }
+
+    /// Remove the node with `id` from the graph, also removing any
+    /// connections that reference it.
+    ///
+    /// Returns `true` if the node existed.
+    pub fn remove_node(&mut self, id: &str) -> bool {
+        let existed = self.nodes.remove(id).is_some();
+        self.connections.retain(|c|
+            c.source_node != id && c.target_node != id
+        );
+        existed
+    }
+
+    /// Remove all connections that don't satisfy `predicate`.
+    pub fn retain_connections<F>(&mut self, predicate: F)
+    where
+        F: FnMut(&Connection) -> bool,
+    {
+        self.connections.retain(predicate);
+    }
 }

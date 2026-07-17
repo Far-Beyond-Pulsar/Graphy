@@ -80,6 +80,8 @@ pub use core::{
     // v2 types
     NodeKind, PropertyValue, PropertySchema, ReflectedType, PrimitiveKind,
     ParamMeta,
+    // conversion metadata
+    ConversionInfo,
     // document model
     BlueprintDocument, BlueprintMetadata, ClassVariable, DocumentEditorState,
     Graph, GraphId, GraphInterface, GraphKind, GraphViewState, InterfacePin,
@@ -116,7 +118,8 @@ pub use diagnostics::{
 };
 
 pub use type_checker::{
-    Coercion, CoercionRegistry, TypeChecker,
+    Coercion, CoercionRegistry, TypeChecker, ConversionRegistry,
+    ConversionResolver, ConversionSuggestion,
 };
 
 /// Result type used throughout Graphy

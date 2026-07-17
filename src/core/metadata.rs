@@ -97,6 +97,54 @@ impl ParamMeta {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ConversionInfo — declares that this node converts one type to another
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Declares that this node type performs an explicit type conversion from
+/// `from_type` to `to_type`.
+///
+/// When the compiler (or editor) encounters a type mismatch between a
+/// source output and a target input, it can look up registered conversions
+/// and automatically insert conversion nodes — either a single hop or a
+/// chain through intermediate types.
+///
+/// # Example
+///
+/// A WGSL node that converts `vec3<f32>` → `vec4<f32>` (adding alpha=1):
+///
+/// ```
+/// use graphy::{NodeMetadata, NodeTypes, ConversionInfo, TypeInfo};
+///
+/// let meta = NodeMetadata::new("vec3_to_vec4", NodeTypes::pure, "Conversion")
+///     .with_params(vec![/* input pin */])
+///     .with_return_type("vec4<f32>")
+///     .with_source("vec4<f32>(input, 1.0)")
+///     .with_conversion(
+///         TypeInfo::new("vec3<f32>"),
+///         TypeInfo::new("vec4<f32>"),
+///         true,  // lossless
+///     );
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversionInfo {
+    /// Source type this node converts *from*.
+    pub from_type: TypeInfo,
+
+    /// Target type this node converts *to*.
+    pub to_type: TypeInfo,
+
+    /// `true` if the conversion is lossless (no data discarded).
+    #[serde(default)]
+    pub lossless: bool,
+}
+
+impl ConversionInfo {
+    pub fn new(from_type: impl Into<TypeInfo>, to_type: impl Into<TypeInfo>, lossless: bool) -> Self {
+        Self { from_type: from_type.into(), to_type: to_type.into(), lossless }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NodeMetadata
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -187,6 +235,13 @@ pub struct NodeMetadata {
     /// within a node.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub helper_functions: Vec<(String, String)>,
+
+    /// If `Some`, this node performs an explicit type conversion from
+    /// `conversion.from_type` to `conversion.to_type`.  The compiler uses
+    /// this to auto-insert conversion nodes when connecting mismatched
+    /// types.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversion: Option<ConversionInfo>,
 }
 
 impl NodeMetadata {
@@ -215,6 +270,7 @@ impl NodeMetadata {
             deprecated: None,
             metadata_version: 0,
             helper_functions: Vec::new(),
+            conversion: None,
         }
     }
 
@@ -324,6 +380,17 @@ impl NodeMetadata {
             .iter()
             .map(|(name, source)| ((*name).to_string(), (*source).to_string()))
             .collect();
+        self
+    }
+
+    /// Declares that this node converts `from_type` → `to_type`.
+    ///
+    /// The compiler auto-inserts conversion nodes when connecting
+    /// mismatched pin types if a registered conversion path exists.
+    #[inline]
+    #[must_use]
+    pub fn with_conversion(mut self, from: impl Into<TypeInfo>, to: impl Into<TypeInfo>, lossless: bool) -> Self {
+        self.conversion = Some(ConversionInfo::new(from, to, lossless));
         self
     }
 
