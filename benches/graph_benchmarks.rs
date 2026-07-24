@@ -137,10 +137,10 @@ fn create_linear_chain(length: usize) -> GraphDescription {
 
     // Create constant node
     let mut constant = NodeInstance::new("const_0", "math.constant", Position::new(0.0, 0.0));
-    constant.properties.insert("value".to_string(), PropertyValue::Number(1.0));
+    constant.set_typed_property("value", PropertyValue::Float(1.0));
     constant.outputs.push(PinInstance::new(
         "out",
-        Pin::new("value", "Value", DataType::Typed("f64".into()), PinType::Output),
+        Pin::new("value", "Value", DataType::typed("f64"), PinType::Output),
     ));
     graph.add_node(constant);
 
@@ -151,18 +151,18 @@ fn create_linear_chain(length: usize) -> GraphDescription {
         
         node.inputs.push(PinInstance::new(
             "a",
-            Pin::new("a", "A", DataType::Typed("f64".into()), PinType::Input),
+            Pin::new("a", "A", DataType::typed("f64"), PinType::Input),
         ));
         node.inputs.push(PinInstance::new(
             "b",
-            Pin::new("b", "B", DataType::Typed("f64".into()), PinType::Input),
+            Pin::new("b", "B", DataType::typed("f64"), PinType::Input),
         ));
         node.outputs.push(PinInstance::new(
             "result",
-            Pin::new("result", "Result", DataType::Typed("f64".into()), PinType::Output),
+            Pin::new("result", "Result", DataType::typed("f64"), PinType::Output),
         ));
         
-        node.properties.insert("b".to_string(), PropertyValue::Number(1.0));
+        node.set_typed_property("b", PropertyValue::Float(1.0));
         graph.add_node(node);
 
         // Connect to previous node
@@ -190,10 +190,10 @@ fn create_wide_graph(width: usize) -> GraphDescription {
     for i in 0..width {
         let node_id = format!("const_{}", i);
         let mut node = NodeInstance::new(&node_id, "math.constant", Position::new(i as f64 * 100.0, 0.0));
-        node.properties.insert("value".to_string(), PropertyValue::Number(i as f64));
+        node.set_typed_property("value", PropertyValue::Float(i as f64));
         node.outputs.push(PinInstance::new(
             "value",
-            Pin::new("value", "Value", DataType::Typed("f64".into()), PinType::Output),
+            Pin::new("value", "Value", DataType::typed("f64"), PinType::Output),
         ));
         graph.add_node(node);
     }
@@ -203,9 +203,9 @@ fn create_wide_graph(width: usize) -> GraphDescription {
         let node_id = format!("op_{}", i);
         let mut node = NodeInstance::new(&node_id, "math.multiply", Position::new(i as f64 * 100.0 + 50.0, 200.0));
         
-        node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::Typed("f64".into()), PinType::Input)));
-        node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::Typed("f64".into()), PinType::Input)));
-        node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::Typed("f64".into()), PinType::Output)));
+        node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::typed("f64"), PinType::Input)));
+        node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::typed("f64"), PinType::Input)));
+        node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::typed("f64"), PinType::Output)));
         
         graph.add_node(node);
 
@@ -229,9 +229,9 @@ fn create_wide_graph(width: usize) -> GraphDescription {
 
     // Final convergence node
     let mut final_node = NodeInstance::new("final_add", "math.add", Position::new(width as f64 * 50.0, 400.0));
-    final_node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::Typed("f64".into()), PinType::Input)));
-    final_node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::Typed("f64".into()), PinType::Input)));
-    final_node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::Typed("f64".into()), PinType::Output)));
+    final_node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::typed("f64"), PinType::Input)));
+    final_node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::typed("f64"), PinType::Input)));
+    final_node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::typed("f64"), PinType::Output)));
     graph.add_node(final_node);
 
     // Connect first and last operation to final
@@ -278,15 +278,15 @@ fn create_dependency_tree(depth: usize) -> GraphDescription {
         if current_depth == 0 {
             // Leaf node - constant
             let mut node = NodeInstance::new(&node_id, "math.constant", Position::new(x_offset, y_pos));
-            node.properties.insert("value".to_string(), PropertyValue::Number(*counter as f64));
-            node.outputs.push(PinInstance::new("value", Pin::new("value", "Value", DataType::Typed("f64".into()), PinType::Output)));
+            node.set_typed_property("value", PropertyValue::Float(*counter as f64));
+            node.outputs.push(PinInstance::new("value", Pin::new("value", "Value", DataType::typed("f64"), PinType::Output)));
             graph.add_node(node);
         } else {
             // Internal node - operation
             let mut node = NodeInstance::new(&node_id, "math.add", Position::new(x_offset, y_pos));
-            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::Typed("f64".into()), PinType::Input)));
-            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::Typed("f64".into()), PinType::Input)));
-            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::Typed("f64".into()), PinType::Output)));
+            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::typed("f64"), PinType::Input)));
+            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::typed("f64"), PinType::Input)));
+            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::typed("f64"), PinType::Output)));
             graph.add_node(node.clone());
 
             // Create children
@@ -325,7 +325,7 @@ fn create_control_flow_graph(num_branches: usize) -> GraphDescription {
 
     // Event start
     let mut event = NodeInstance::new("start", "event.start", Position::new(0.0, 0.0));
-    event.outputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Execution, PinType::Output)));
+    event.outputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Exec, PinType::Output)));
     graph.add_node(event);
 
     // Create chain of branches
@@ -333,12 +333,12 @@ fn create_control_flow_graph(num_branches: usize) -> GraphDescription {
         let branch_id = format!("branch_{}", i);
         let mut branch = NodeInstance::new(&branch_id, "branch", Position::new(200.0 * (i + 1) as f64, 0.0));
         
-        branch.inputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Execution, PinType::Input)));
-        branch.inputs.push(PinInstance::new("condition", Pin::new("condition", "Condition", DataType::Typed("bool".into()), PinType::Input)));
-        branch.outputs.push(PinInstance::new("true", Pin::new("true", "True", DataType::Execution, PinType::Output)));
-        branch.outputs.push(PinInstance::new("false", Pin::new("false", "False", DataType::Execution, PinType::Output)));
+        branch.inputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Exec, PinType::Input)));
+        branch.inputs.push(PinInstance::new("condition", Pin::new("condition", "Condition", DataType::typed("bool"), PinType::Input)));
+        branch.outputs.push(PinInstance::new("true", Pin::new("true", "True", DataType::Exec, PinType::Output)));
+        branch.outputs.push(PinInstance::new("false", Pin::new("false", "False", DataType::Exec, PinType::Output)));
         
-        branch.properties.insert("condition".to_string(), PropertyValue::Boolean(i % 2 == 0));
+        branch.set_typed_property("condition", PropertyValue::Bool(i % 2 == 0));
         graph.add_node(branch);
 
         // Connect execution flow
@@ -356,18 +356,18 @@ fn create_control_flow_graph(num_branches: usize) -> GraphDescription {
         // Create print nodes for true and false paths
         let print_true_id = format!("print_true_{}", i);
         let mut print_true = NodeInstance::new(&print_true_id, "print", Position::new(200.0 * (i + 1) as f64, -150.0));
-        print_true.inputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Execution, PinType::Input)));
-        print_true.inputs.push(PinInstance::new("value", Pin::new("value", "Value", DataType::Typed("String".into()), PinType::Input)));
-        print_true.outputs.push(PinInstance::new("then", Pin::new("then", "Then", DataType::Execution, PinType::Output)));
-        print_true.properties.insert("value".to_string(), PropertyValue::String(format!("True branch {}", i)));
+        print_true.inputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Exec, PinType::Input)));
+        print_true.inputs.push(PinInstance::new("value", Pin::new("value", "Value", DataType::typed("String"), PinType::Input)));
+        print_true.outputs.push(PinInstance::new("then", Pin::new("then", "Then", DataType::Exec, PinType::Output)));
+        print_true.set_typed_property("value", PropertyValue::String(format!("True branch {}", i)));
         graph.add_node(print_true);
 
         let print_false_id = format!("print_false_{}", i);
         let mut print_false = NodeInstance::new(&print_false_id, "print", Position::new(200.0 * (i + 1) as f64, 150.0));
-        print_false.inputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Execution, PinType::Input)));
-        print_false.inputs.push(PinInstance::new("value", Pin::new("value", "Value", DataType::Typed("String".into()), PinType::Input)));
-        print_false.outputs.push(PinInstance::new("then", Pin::new("then", "Then", DataType::Execution, PinType::Output)));
-        print_false.properties.insert("value".to_string(), PropertyValue::String(format!("False branch {}", i)));
+        print_false.inputs.push(PinInstance::new("exec", Pin::new("exec", "Exec", DataType::Exec, PinType::Input)));
+        print_false.inputs.push(PinInstance::new("value", Pin::new("value", "Value", DataType::typed("String"), PinType::Input)));
+        print_false.outputs.push(PinInstance::new("then", Pin::new("then", "Then", DataType::Exec, PinType::Output)));
+        print_false.set_typed_property("value", PropertyValue::String(format!("False branch {}", i)));
         graph.add_node(print_false);
 
         // Connect branches to prints
@@ -401,13 +401,13 @@ fn create_monster_graph(scale: usize) -> GraphDescription {
             let node_id = format!("grid_{}_{}", row, col);
             let mut node = NodeInstance::new(&node_id, "math.multiply", Position::new(col as f64 * 150.0, row as f64 * 150.0));
             
-            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::Typed("f64".into()), PinType::Input)));
-            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::Typed("f64".into()), PinType::Input)));
-            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::Typed("f64".into()), PinType::Output)));
+            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::typed("f64"), PinType::Input)));
+            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::typed("f64"), PinType::Input)));
+            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::typed("f64"), PinType::Output)));
             
             if col == 0 {
-                node.properties.insert("a".to_string(), PropertyValue::Number(row as f64));
-                node.properties.insert("b".to_string(), PropertyValue::Number(1.0));
+                node.set_typed_property("a", PropertyValue::Float(row as f64));
+                node.set_typed_property("b", PropertyValue::Float(1.0));
             }
             
             graph.add_node(node);
