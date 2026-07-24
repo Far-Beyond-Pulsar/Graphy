@@ -60,13 +60,13 @@ fn create_grid(size: usize) -> GraphDescription {
                 Position::new(col as f64 * 100.0, row as f64 * 100.0)
             );
             
-            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::Typed("f64".into()), PinType::Input)));
-            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::Typed("f64".into()), PinType::Input)));
-            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::Typed("f64".into()), PinType::Output)));
+            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::typed("f64"), PinType::Input)));
+            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::typed("f64"), PinType::Input)));
+            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::typed("f64"), PinType::Output)));
             
             if col == 0 || row == 0 {
-                node.properties.insert("a".to_string(), PropertyValue::Number(1.0));
-                node.properties.insert("b".to_string(), PropertyValue::Number(1.0));
+                node.set_typed_property("a", PropertyValue::Float(1.0));
+                node.set_typed_property("b", PropertyValue::Float(1.0));
             }
             
             graph.add_node(node);
