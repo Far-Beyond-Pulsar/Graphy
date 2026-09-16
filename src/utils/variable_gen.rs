@@ -68,7 +68,13 @@ impl Default for VariableNameGenerator {
 /// Sanitize a string to be a valid Rust variable name
 pub fn sanitize_name(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 

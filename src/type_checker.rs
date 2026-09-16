@@ -33,16 +33,11 @@
 //! }
 //! ```
 
-use crate::{
-    core::{
-        Connection, ConnectionType, GraphDescription, NodeInstance,
-        NodeMetadataProvider,
-    },
-    diagnostics::{
-        CompileResult, Diagnostic, DiagnosticAccumulator, PassName, Severity,
-    },
-};
 use crate::core::ReflectedType;
+use crate::{
+    core::{Connection, ConnectionType, GraphDescription, NodeInstance, NodeMetadataProvider},
+    diagnostics::{CompileResult, Diagnostic, DiagnosticAccumulator, PassName, Severity},
+};
 use std::collections::{HashMap, VecDeque};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,11 +57,19 @@ pub struct Coercion {
 
 impl Coercion {
     pub fn lossless(from: ReflectedType, to: ReflectedType) -> Self {
-        Self { from, to, lossless: true }
+        Self {
+            from,
+            to,
+            lossless: true,
+        }
     }
 
     pub fn lossy(from: ReflectedType, to: ReflectedType) -> Self {
-        Self { from, to, lossless: false }
+        Self {
+            from,
+            to,
+            lossless: false,
+        }
     }
 }
 
@@ -84,7 +87,9 @@ pub struct CoercionRegistry {
 
 impl CoercionRegistry {
     /// Creates an empty registry.
-    pub fn empty() -> Self { Self { rules: Vec::new() } }
+    pub fn empty() -> Self {
+        Self { rules: Vec::new() }
+    }
 
     /// Creates the default registry with standard Rust numeric widening coercions.
     pub fn with_defaults() -> Self {
@@ -92,32 +97,101 @@ impl CoercionRegistry {
         let mut reg = Self::empty();
 
         // Lossless integer widenings
-        reg.add(Coercion::lossless(ReflectedType::prim(I8),  ReflectedType::prim(I16)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I8),  ReflectedType::prim(I32)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I8),  ReflectedType::prim(I64)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I8),  ReflectedType::prim(I128)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I8),  ReflectedType::prim(Isize)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I16), ReflectedType::prim(I32)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I16), ReflectedType::prim(I64)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I16), ReflectedType::prim(I128)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I32), ReflectedType::prim(I64)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I32), ReflectedType::prim(I128)));
-        reg.add(Coercion::lossless(ReflectedType::prim(I64), ReflectedType::prim(I128)));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I8),
+            ReflectedType::prim(I16),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I8),
+            ReflectedType::prim(I32),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I8),
+            ReflectedType::prim(I64),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I8),
+            ReflectedType::prim(I128),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I8),
+            ReflectedType::prim(Isize),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I16),
+            ReflectedType::prim(I32),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I16),
+            ReflectedType::prim(I64),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I16),
+            ReflectedType::prim(I128),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I32),
+            ReflectedType::prim(I64),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I32),
+            ReflectedType::prim(I128),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(I64),
+            ReflectedType::prim(I128),
+        ));
 
-        reg.add(Coercion::lossless(ReflectedType::prim(U8),  ReflectedType::prim(U16)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U8),  ReflectedType::prim(U32)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U8),  ReflectedType::prim(U64)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U8),  ReflectedType::prim(U128)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U8),  ReflectedType::prim(Usize)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U16), ReflectedType::prim(U32)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U16), ReflectedType::prim(U64)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U16), ReflectedType::prim(U128)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U32), ReflectedType::prim(U64)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U32), ReflectedType::prim(U128)));
-        reg.add(Coercion::lossless(ReflectedType::prim(U64), ReflectedType::prim(U128)));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U8),
+            ReflectedType::prim(U16),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U8),
+            ReflectedType::prim(U32),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U8),
+            ReflectedType::prim(U64),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U8),
+            ReflectedType::prim(U128),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U8),
+            ReflectedType::prim(Usize),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U16),
+            ReflectedType::prim(U32),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U16),
+            ReflectedType::prim(U64),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U16),
+            ReflectedType::prim(U128),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U32),
+            ReflectedType::prim(U64),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U32),
+            ReflectedType::prim(U128),
+        ));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(U64),
+            ReflectedType::prim(U128),
+        ));
 
         // f32 → f64 widening
-        reg.add(Coercion::lossless(ReflectedType::prim(F32), ReflectedType::prim(F64)));
+        reg.add(Coercion::lossless(
+            ReflectedType::prim(F32),
+            ReflectedType::prim(F64),
+        ));
 
         // &str → String
         reg.add(Coercion::lossless(
@@ -147,7 +221,9 @@ impl CoercionRegistry {
 }
 
 impl Default for CoercionRegistry {
-    fn default() -> Self { Self::with_defaults() }
+    fn default() -> Self {
+        Self::with_defaults()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,14 +271,20 @@ impl ConversionRegistry {
 
     /// Look up a direct conversion node type from `from_type` to `to_type`.
     pub fn find_direct(&self, from_type: &str, to_type: &str) -> Option<&str> {
-        self.hops.get(&(from_type.to_string(), to_type.to_string())).map(|s| s.as_str())
+        self.hops
+            .get(&(from_type.to_string(), to_type.to_string()))
+            .map(|s| s.as_str())
     }
 
     /// Find the shortest conversion path (BFS) from `from_type` to `to_type`.
     ///
     /// Returns `None` if no path exists.  Each element is `(node_type, from_type, to_type)`
     /// where the node_type borrows from the registry's internal storage.
-    pub fn find_path<'s>(&'s self, from_type: &'s str, to_type: &'s str) -> Option<Vec<(&'s str, &'s str, &'s str)>> {
+    pub fn find_path<'s>(
+        &'s self,
+        from_type: &'s str,
+        to_type: &'s str,
+    ) -> Option<Vec<(&'s str, &'s str, &'s str)>> {
         if from_type == to_type {
             return Some(Vec::new());
         }
@@ -218,7 +300,10 @@ impl ConversionRegistry {
             if let Some(neighbors) = self.edges.get(current) {
                 for (next_type, node_name) in neighbors {
                     if !visited.contains_key(next_type.as_str()) {
-                        visited.insert(next_type, Some((node_name.as_str(), current, next_type.as_str())));
+                        visited.insert(
+                            next_type,
+                            Some((node_name.as_str(), current, next_type.as_str())),
+                        );
                         if next_type == to_type {
                             // Reconstruct path
                             let mut path = Vec::new();
@@ -264,7 +349,11 @@ pub struct TypeChecker {
 
 impl TypeChecker {
     pub fn new(coercions: CoercionRegistry) -> Self {
-        Self { coercions, warn_lossy: true, error_on_deprecated: false }
+        Self {
+            coercions,
+            warn_lossy: true,
+            error_on_deprecated: false,
+        }
     }
 
     /// Checks all connections in `graph` against `provider`.
@@ -293,9 +382,12 @@ impl TypeChecker {
                             Severity::Warning
                         };
                         acc.push_diagnostic(
-                            Diagnostic::new(sev, PassName::TypeChecker,
-                                format!("Node '{}' is deprecated: {}", node_type, msg))
-                                .at_node(node_id)
+                            Diagnostic::new(
+                                sev,
+                                PassName::TypeChecker,
+                                format!("Node '{}' is deprecated: {}", node_type, msg),
+                            )
+                            .at_node(node_id),
                         );
                     }
                 }
@@ -322,13 +414,15 @@ impl TypeChecker {
         if conn.connection_type == ConnectionType::Execution {
             if graph.nodes.get(&conn.source_node).is_none() {
                 acc.error(
-                    &conn.source_node, None,
+                    &conn.source_node,
+                    None,
                     format!("Source node '{}' does not exist", conn.source_node),
                 );
             }
             if graph.nodes.get(&conn.target_node).is_none() {
                 acc.error(
-                    &conn.target_node, None,
+                    &conn.target_node,
+                    None,
                     format!("Target node '{}' does not exist", conn.target_node),
                 );
             }
@@ -339,16 +433,22 @@ impl TypeChecker {
         let source = match graph.nodes.get(&conn.source_node) {
             Some(n) => n,
             None => {
-                acc.error(&conn.source_node, None,
-                    format!("Source node '{}' does not exist", conn.source_node));
+                acc.error(
+                    &conn.source_node,
+                    None,
+                    format!("Source node '{}' does not exist", conn.source_node),
+                );
                 return;
             }
         };
         let target = match graph.nodes.get(&conn.target_node) {
             Some(n) => n,
             None => {
-                acc.error(&conn.target_node, None,
-                    format!("Target node '{}' does not exist", conn.target_node));
+                acc.error(
+                    &conn.target_node,
+                    None,
+                    format!("Target node '{}' does not exist", conn.target_node),
+                );
                 return;
             }
         };
@@ -467,7 +567,9 @@ impl TypeChecker {
 }
 
 impl Default for TypeChecker {
-    fn default() -> Self { Self::new(CoercionRegistry::default()) }
+    fn default() -> Self {
+        Self::new(CoercionRegistry::default())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -545,17 +647,26 @@ impl ConversionResolver {
                 continue;
             }
 
-            let src_type_str = resolve_output_type_str(graph, &conn.source_node, &conn.source_pin, provider);
-            let tgt_type_str = resolve_input_type_str(graph, &conn.target_node, &conn.target_pin, provider);
+            let src_type_str =
+                resolve_output_type_str(graph, &conn.source_node, &conn.source_pin, provider);
+            let tgt_type_str =
+                resolve_input_type_str(graph, &conn.target_node, &conn.target_pin, provider);
 
-            let (Some(src_str), Some(tgt_str)) = (src_type_str, tgt_type_str) else { continue };
-            if src_str == tgt_str { continue; }
+            let (Some(src_str), Some(tgt_str)) = (src_type_str, tgt_type_str) else {
+                continue;
+            };
+            if src_str == tgt_str {
+                continue;
+            }
 
             // If an implicit coercion already handles it, skip.
-            if CoercionRegistry::default().find(
-                &ReflectedType::parse_str(&src_str),
-                &ReflectedType::parse_str(&tgt_str),
-            ).is_some() {
+            if CoercionRegistry::default()
+                .find(
+                    &ReflectedType::parse_str(&src_str),
+                    &ReflectedType::parse_str(&tgt_str),
+                )
+                .is_some()
+            {
                 continue;
             }
 
@@ -568,9 +679,10 @@ impl ConversionResolver {
                     target_pin: conn.target_pin.clone(),
                     from_type: src_str.clone(),
                     to_type: tgt_str.clone(),
-                    path: path.into_iter().map(|(n, f, t)| {
-                        (n.to_string(), f.to_string(), t.to_string())
-                    }).collect(),
+                    path: path
+                        .into_iter()
+                        .map(|(n, f, t)| (n.to_string(), f.to_string(), t.to_string()))
+                        .collect(),
                 });
             }
         }
@@ -664,8 +776,12 @@ mod tests {
     struct SimpleProvider(HashMap<String, NodeMetadata>);
 
     impl NodeMetadataProvider for SimpleProvider {
-        fn get_node_metadata(&self, t: &str) -> Option<&NodeMetadata> { self.0.get(t) }
-        fn get_all_nodes(&self) -> Vec<&NodeMetadata> { self.0.values().collect() }
+        fn get_node_metadata(&self, t: &str) -> Option<&NodeMetadata> {
+            self.0.get(t)
+        }
+        fn get_all_nodes(&self) -> Vec<&NodeMetadata> {
+            self.0.values().collect()
+        }
         fn get_nodes_by_category(&self, cat: &str) -> Vec<&NodeMetadata> {
             self.0.values().filter(|m| m.category == cat).collect()
         }
@@ -673,14 +789,17 @@ mod tests {
 
     fn make_provider() -> SimpleProvider {
         let mut map = HashMap::new();
-        map.insert("math.add".to_string(), NodeMetadata::new("math.add", NodeTypes::pure, "Math")
-            .with_params(vec![
-                ParamInfo::new("a", "f64"),
-                ParamInfo::new("b", "f64"),
-            ])
-            .with_return_type(TypeInfo::new("f64")));
-        map.insert("print".to_string(), NodeMetadata::new("print", NodeTypes::fn_, "IO")
-            .with_params(vec![ParamInfo::new("value", "f64")]));
+        map.insert(
+            "math.add".to_string(),
+            NodeMetadata::new("math.add", NodeTypes::pure, "Math")
+                .with_params(vec![ParamInfo::new("a", "f64"), ParamInfo::new("b", "f64")])
+                .with_return_type(TypeInfo::new("f64")),
+        );
+        map.insert(
+            "print".to_string(),
+            NodeMetadata::new("print", NodeTypes::fn_, "IO")
+                .with_params(vec![ParamInfo::new("value", "f64")]),
+        );
         SimpleProvider(map)
     }
 

@@ -80,7 +80,9 @@ impl GraphLibrary for HashMap<String, GraphDescription> {
 pub struct SubGraphExpander;
 
 impl SubGraphExpander {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -110,10 +112,7 @@ impl SubGraphExpander {
     }
 
     /// Convenience wrapper: creates an expander and runs expansion.
-    pub fn expand(
-        root: &mut GraphDescription,
-        library: &dyn GraphLibrary,
-    ) -> Result<()> {
+    pub fn expand(root: &mut GraphDescription, library: &dyn GraphLibrary) -> Result<()> {
         Self::new().expand_all_flat(root, library)
     }
 
@@ -185,7 +184,7 @@ impl SubGraphExpander {
 
         // Clone all non-entry/exit nodes from sub into parent, with prefix
         let mut entry_node_id: Option<String> = None;
-        let mut exit_node_id:  Option<String> = None;
+        let mut exit_node_id: Option<String> = None;
 
         for (_, node) in &sub.nodes {
             match node.kind() {
@@ -324,12 +323,24 @@ mod tests {
         SubGraphExpander::expand(&mut parent, &lib).unwrap();
 
         // call1 node must be gone
-        assert!(!parent.nodes.contains_key("call1"), "call node should be removed");
+        assert!(
+            !parent.nodes.contains_key("call1"),
+            "call node should be removed"
+        );
 
         // entry and exit must be present under prefixed names
-        assert!(parent.nodes.contains_key("call1__entry"), "entry node missing");
-        assert!(parent.nodes.contains_key("call1__exit"), "exit node missing");
-        assert!(parent.nodes.contains_key("call1__inner_add"), "inner_add missing");
+        assert!(
+            parent.nodes.contains_key("call1__entry"),
+            "entry node missing"
+        );
+        assert!(
+            parent.nodes.contains_key("call1__exit"),
+            "exit node missing"
+        );
+        assert!(
+            parent.nodes.contains_key("call1__inner_add"),
+            "inner_add missing"
+        );
 
         // Connections should not reference call1 any more
         for conn in &parent.connections {
@@ -353,8 +364,11 @@ mod tests {
         let result = SubGraphExpander::expand(&mut a, &lib);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("Circular") || msg.contains("circular") || msg.contains("cycle"),
-            "unexpected error message: {}", msg);
+        assert!(
+            msg.contains("Circular") || msg.contains("circular") || msg.contains("cycle"),
+            "unexpected error message: {}",
+            msg
+        );
     }
 
     #[test]

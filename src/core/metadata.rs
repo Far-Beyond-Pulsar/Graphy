@@ -36,7 +36,10 @@ pub struct ParamInfo {
 impl ParamInfo {
     #[inline]
     pub fn new(name: impl Into<String>, param_type: impl Into<String>) -> Self {
-        Self { name: name.into(), param_type: param_type.into() }
+        Self {
+            name: name.into(),
+            param_type: param_type.into(),
+        }
     }
 
     /// Converts to the richer [`ParamMeta`] by parsing the type string.
@@ -78,7 +81,12 @@ pub struct ParamMeta {
 
 impl ParamMeta {
     pub fn new(name: impl Into<String>, ty: ReflectedType) -> Self {
-        Self { name: name.into(), ty, default_value: None, is_exec: false }
+        Self {
+            name: name.into(),
+            ty,
+            default_value: None,
+            is_exec: false,
+        }
     }
 
     pub fn exec(name: impl Into<String>) -> Self {
@@ -141,7 +149,11 @@ pub struct OutputParam {
 }
 
 impl OutputParam {
-    pub fn new(name: impl Into<String>, param_type: impl Into<String>, accessor: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        param_type: impl Into<String>,
+        accessor: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             param_type: param_type.into(),
@@ -193,8 +205,16 @@ pub struct ConversionInfo {
 }
 
 impl ConversionInfo {
-    pub fn new(from_type: impl Into<TypeInfo>, to_type: impl Into<TypeInfo>, lossless: bool) -> Self {
-        Self { from_type: from_type.into(), to_type: to_type.into(), lossless }
+    pub fn new(
+        from_type: impl Into<TypeInfo>,
+        to_type: impl Into<TypeInfo>,
+        lossless: bool,
+    ) -> Self {
+        Self {
+            from_type: from_type.into(),
+            to_type: to_type.into(),
+            lossless,
+        }
     }
 }
 
@@ -225,7 +245,6 @@ impl ConversionInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeMetadata {
     // ── Core identity (v1) ───────────────────────────────────────────────────
-
     /// Node identifier (e.g. `"add"`, `"print"`, `"branch"`).
     pub name: String,
 
@@ -251,7 +270,6 @@ pub struct NodeMetadata {
     pub function_source: String,
 
     // ── Extended metadata (v2) ───────────────────────────────────────────────
-
     /// Rich parameter definitions. If present, takes precedence over `params`
     /// for type checking. Populated by the v2 `#[blueprint]` macro.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -309,11 +327,7 @@ impl NodeMetadata {
     /// Creates a new `NodeMetadata` with required fields. Use builder methods
     /// to add parameters, return types, source, etc.
     #[inline]
-    pub fn new(
-        name: impl Into<String>,
-        node_type: NodeTypes,
-        category: impl Into<String>,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, node_type: NodeTypes, category: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             node_type,
@@ -459,7 +473,12 @@ impl NodeMetadata {
     /// mismatched pin types if a registered conversion path exists.
     #[inline]
     #[must_use]
-    pub fn with_conversion(mut self, from: impl Into<TypeInfo>, to: impl Into<TypeInfo>, lossless: bool) -> Self {
+    pub fn with_conversion(
+        mut self,
+        from: impl Into<TypeInfo>,
+        to: impl Into<TypeInfo>,
+        lossless: bool,
+    ) -> Self {
         self.conversion = Some(ConversionInfo::new(from, to, lossless));
         self
     }
@@ -554,8 +573,10 @@ mod helper_function_tests {
 
     #[test]
     fn with_helpers_stores_named_sources() {
-        let meta = NodeMetadata::new("perlin_2d", NodeTypes::pure, "Noise")
-            .with_helpers(&[("pn_hash21", "fn pn_hash21() {}"), ("pn_perlin", "fn pn_perlin() {}")]);
+        let meta = NodeMetadata::new("perlin_2d", NodeTypes::pure, "Noise").with_helpers(&[
+            ("pn_hash21", "fn pn_hash21() {}"),
+            ("pn_perlin", "fn pn_perlin() {}"),
+        ]);
         assert_eq!(meta.helper_functions.len(), 2);
         assert_eq!(meta.helper_functions[0].0, "pn_hash21");
         assert_eq!(meta.helper_functions[1].1, "fn pn_perlin() {}");

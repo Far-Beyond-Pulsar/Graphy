@@ -25,19 +25,13 @@ impl TestMetadataProvider {
 
         provider.add(
             NodeMetadata::new("add", NodeTypes::pure, "math")
-                .with_params(vec![
-                    ParamInfo::new("a", "i64"),
-                    ParamInfo::new("b", "i64"),
-                ])
+                .with_params(vec![ParamInfo::new("a", "i64"), ParamInfo::new("b", "i64")])
                 .with_return_type("i64"),
         );
 
         provider.add(
             NodeMetadata::new("multiply", NodeTypes::pure, "math")
-                .with_params(vec![
-                    ParamInfo::new("a", "i64"),
-                    ParamInfo::new("b", "i64"),
-                ])
+                .with_params(vec![ParamInfo::new("a", "i64"), ParamInfo::new("b", "i64")])
                 .with_return_type("i64"),
         );
 
@@ -278,7 +272,8 @@ pub fn build_branch_graph() -> GraphDescription {
     graph.add_node(branch);
 
     // True-side print
-    let mut print_true = NodeInstance::new("print_true", "print_string", Position::new(400.0, -100.0));
+    let mut print_true =
+        NodeInstance::new("print_true", "print_string", Position::new(400.0, -100.0));
     print_true.add_input_pin("exec_in", DataType::Exec);
     print_true.add_input_pin("message", DataType::typed("String"));
     print_true.add_output_pin("exec_out", DataType::Exec);
@@ -286,7 +281,8 @@ pub fn build_branch_graph() -> GraphDescription {
     graph.add_node(print_true);
 
     // False-side print
-    let mut print_false = NodeInstance::new("print_false", "print_string", Position::new(400.0, 100.0));
+    let mut print_false =
+        NodeInstance::new("print_false", "print_string", Position::new(400.0, 100.0));
     print_false.add_input_pin("exec_in", DataType::Exec);
     print_false.add_input_pin("message", DataType::typed("String"));
     print_false.add_output_pin("exec_out", DataType::Exec);
@@ -294,9 +290,21 @@ pub fn build_branch_graph() -> GraphDescription {
     graph.add_node(print_false);
 
     // Connections
-    graph.add_connection(Connection::execution("start", "exec", "branch_1", "exec_in"));
-    graph.add_connection(Connection::execution("branch_1", "True", "print_true", "exec_in"));
-    graph.add_connection(Connection::execution("branch_1", "False", "print_false", "exec_in"));
+    graph.add_connection(Connection::execution(
+        "start", "exec", "branch_1", "exec_in",
+    ));
+    graph.add_connection(Connection::execution(
+        "branch_1",
+        "True",
+        "print_true",
+        "exec_in",
+    ));
+    graph.add_connection(Connection::execution(
+        "branch_1",
+        "False",
+        "print_false",
+        "exec_in",
+    ));
 
     graph
 }

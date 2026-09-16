@@ -137,9 +137,9 @@ impl VisitMut for ExecOutputReplacer {
                                 // Replace with a BLOCK containing ALL replacement statements.
                                 // Using a block (not just the first stmt) preserves every
                                 // node in a multi-node chain that follows a Sequence output.
-                                if let Ok(block) = syn::parse_str::<Block>(
-                                    &format!("{{{}}}", replacement_code),
-                                ) {
+                                if let Ok(block) =
+                                    syn::parse_str::<Block>(&format!("{{{}}}", replacement_code))
+                                {
                                     *stmt = Stmt::Expr(
                                         Expr::Block(syn::ExprBlock {
                                             attrs: vec![],
@@ -173,14 +173,16 @@ impl VisitMut for ExecOutputReplacer {
                 if let Ok(label) = syn::parse2::<syn::LitStr>(mac.tokens.clone()) {
                     let label_value = label.value();
 
-                    let empty_block_expr = || Expr::Block(syn::ExprBlock {
-                        attrs: vec![],
-                        label: None,
-                        block: syn::Block {
-                            brace_token: Default::default(),
-                            stmts: vec![],
-                        },
-                    });
+                    let empty_block_expr = || {
+                        Expr::Block(syn::ExprBlock {
+                            attrs: vec![],
+                            label: None,
+                            block: syn::Block {
+                                brace_token: Default::default(),
+                                stmts: vec![],
+                            },
+                        })
+                    };
 
                     match self.replacements.get(&label_value) {
                         Some(replacement_code) if !replacement_code.is_empty() => {
@@ -268,12 +270,12 @@ pub fn extract_exec_output_labels(function_source: &str) -> Result<Vec<String>, 
     let item_fn = parse_function(function_source)?;
     let mut extractor = ExecOutputLabelExtractor { labels: Vec::new() };
     extractor.visit_item_fn(&item_fn);
-    
+
     compiler_debug(
         "ast",
         format!("Extracted {} exec_output labels", extractor.labels.len()),
     );
-    
+
     Ok(extractor.labels)
 }
 
@@ -291,11 +293,11 @@ impl<'ast> Visit<'ast> for ExecOutputLabelExtractor {
                 }
             }
         }
-        
+
         // Continue visiting nested statements and expressions
         visit::visit_stmt(self, stmt);
     }
-    
+
     fn visit_expr(&mut self, expr: &'ast Expr) {
         // Also check for macro expressions (exec_output! in expression position)
         if let Expr::Macro(ExprMacro { mac, .. }) = expr {
@@ -305,7 +307,7 @@ impl<'ast> Visit<'ast> for ExecOutputLabelExtractor {
                 }
             }
         }
-        
+
         // Continue visiting nested expressions
         visit::visit_expr(self, expr);
     }

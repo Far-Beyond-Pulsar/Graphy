@@ -31,7 +31,9 @@ fn exec_routing_single_connection() {
     n2.add_input_pin("exec_in", DataType::Exec);
     graph.add_node(n2);
 
-    graph.add_connection(Connection::execution("node1", "exec_out", "node2", "exec_in"));
+    graph.add_connection(Connection::execution(
+        "node1", "exec_out", "node2", "exec_in",
+    ));
 
     let routing = ExecutionRouting::build_from_graph(&graph);
     let connected = routing.get_connected_nodes("node1", "exec_out");

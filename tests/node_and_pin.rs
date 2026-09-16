@@ -33,7 +33,12 @@ fn pin_new() {
 
 #[test]
 fn pin_typed_data() {
-    let pin = Pin::new("result", "Result", DataType::typed("Vec<f64>"), PinType::Output);
+    let pin = Pin::new(
+        "result",
+        "Result",
+        DataType::typed("Vec<f64>"),
+        PinType::Output,
+    );
     assert_eq!(pin.pin_type, PinType::Output);
     match &pin.data_type {
         DataType::Data(ti) => assert_eq!(ti.type_string, "Vec<f64>"),

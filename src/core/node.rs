@@ -115,7 +115,12 @@ impl Pin {
         data_type: DataType,
         pin_type: PinType,
     ) -> Self {
-        Self { id: id.into(), name: name.into(), data_type, pin_type }
+        Self {
+            id: id.into(),
+            name: name.into(),
+            data_type,
+            pin_type,
+        }
     }
 
     /// Returns `true` if this is an execution-flow pin.
@@ -214,11 +219,7 @@ pub struct NodeInstance {
 impl NodeInstance {
     /// Creates a new node instance with no pins or properties.
     #[inline]
-    pub fn new(
-        id: impl Into<String>,
-        node_type: impl Into<String>,
-        position: Position,
-    ) -> Self {
+    pub fn new(id: impl Into<String>, node_type: impl Into<String>, position: Position) -> Self {
         Self {
             id: id.into(),
             node_type: node_type.into(),
@@ -239,9 +240,7 @@ impl NodeInstance {
             "reroute" => NodeKind::Reroute,
             "subgraph_entry" => NodeKind::SubgraphEntry,
             "subgraph_exit" => NodeKind::SubgraphExit,
-            s if s.starts_with("macro:") => {
-                NodeKind::SubgraphCall(s["macro:".len()..].to_string())
-            }
+            s if s.starts_with("macro:") => NodeKind::SubgraphCall(s["macro:".len()..].to_string()),
             s if s.starts_with("subgraph:") => {
                 NodeKind::SubgraphCall(s["subgraph:".len()..].to_string())
             }
@@ -375,9 +374,18 @@ mod tests {
 
     #[test]
     fn kind_dispatch() {
-        assert!(matches!(NodeInstance::new("a", "reroute", Position::zero()).kind(), NodeKind::Reroute));
-        assert!(matches!(NodeInstance::new("a", "subgraph_entry", Position::zero()).kind(), NodeKind::SubgraphEntry));
-        assert!(matches!(NodeInstance::new("a", "subgraph_exit", Position::zero()).kind(), NodeKind::SubgraphExit));
+        assert!(matches!(
+            NodeInstance::new("a", "reroute", Position::zero()).kind(),
+            NodeKind::Reroute
+        ));
+        assert!(matches!(
+            NodeInstance::new("a", "subgraph_entry", Position::zero()).kind(),
+            NodeKind::SubgraphEntry
+        ));
+        assert!(matches!(
+            NodeInstance::new("a", "subgraph_exit", Position::zero()).kind(),
+            NodeKind::SubgraphExit
+        ));
         let call = NodeInstance::new("a", "macro:abc123", Position::zero());
         assert_eq!(call.kind().subgraph_id(), Some("abc123"));
         let native = NodeInstance::new("a", "math.add", Position::zero());

@@ -123,12 +123,16 @@ impl fmt::Display for TypeInfo {
 
 impl From<&str> for TypeInfo {
     #[inline]
-    fn from(s: &str) -> Self { Self::new(s) }
+    fn from(s: &str) -> Self {
+        Self::new(s)
+    }
 }
 
 impl From<String> for TypeInfo {
     #[inline]
-    fn from(s: String) -> Self { Self::new(s) }
+    fn from(s: String) -> Self {
+        Self::new(s)
+    }
 }
 
 impl From<&ReflectedType> for TypeInfo {
@@ -276,9 +280,7 @@ pub enum ReflectedType {
     },
 
     /// A trait object `dyn Trait`.
-    TraitObject {
-        trait_path: String,
-    },
+    TraitObject { trait_path: String },
 
     /// Wildcard — the `?` or `_` placeholder, compatible with any type.
     Wildcard,
@@ -316,7 +318,10 @@ impl ReflectedType {
     pub fn is_copy_hint(&self) -> bool {
         match self {
             ReflectedType::Primitive(p) => p.is_copy(),
-            ReflectedType::Wrapper { kind: WrapperKind::Ref | WrapperKind::RefMut, .. } => true,
+            ReflectedType::Wrapper {
+                kind: WrapperKind::Ref | WrapperKind::RefMut,
+                ..
+            } => true,
             _ => false,
         }
     }
@@ -329,21 +334,27 @@ impl ReflectedType {
                 if generics.is_empty() {
                     path.clone()
                 } else {
-                    let args = generics.iter().map(|g| g.to_type_string()).collect::<Vec<_>>().join(", ");
+                    let args = generics
+                        .iter()
+                        .map(|g| g.to_type_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
                     format!("{}<{}>", path, args)
                 }
             }
             ReflectedType::Enum { path, .. } => path.clone(),
             ReflectedType::Tuple(elems) => {
-                let inner = elems.iter().map(|e| e.to_type_string()).collect::<Vec<_>>().join(", ");
+                let inner = elems
+                    .iter()
+                    .map(|e| e.to_type_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 format!("({})", inner)
             }
-            ReflectedType::Array { element, len } => {
-                match len {
-                    Some(n) => format!("[{}; {}]", element.to_type_string(), n),
-                    None => format!("[{}]", element.to_type_string()),
-                }
-            }
+            ReflectedType::Array { element, len } => match len {
+                Some(n) => format!("[{}; {}]", element.to_type_string(), n),
+                None => format!("[{}]", element.to_type_string()),
+            },
             ReflectedType::Wrapper { kind, inner } => kind.format_with(inner),
             ReflectedType::TraitObject { trait_path } => format!("dyn {}", trait_path),
             ReflectedType::Wildcard => "?".to_string(),
@@ -378,7 +389,9 @@ impl FromStr for ReflectedType {
 }
 
 impl From<PrimitiveKind> for ReflectedType {
-    fn from(p: PrimitiveKind) -> Self { ReflectedType::Primitive(p) }
+    fn from(p: PrimitiveKind) -> Self {
+        ReflectedType::Primitive(p)
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -389,9 +402,20 @@ impl From<PrimitiveKind> for ReflectedType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PrimitiveKind {
-    I8, I16, I32, I64, I128, Isize,
-    U8, U16, U32, U64, U128, Usize,
-    F32, F64,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+    F32,
+    F64,
     Bool,
     Char,
     /// `&str` — borrowed string slice.
@@ -427,7 +451,13 @@ impl PrimitiveKind {
 
     /// Returns `true` if this is a numeric type (`i*`, `u*`, or `f*`).
     pub const fn is_numeric(self) -> bool {
-        !matches!(self, PrimitiveKind::Bool | PrimitiveKind::Char | PrimitiveKind::StrSlice | PrimitiveKind::StringOwned)
+        !matches!(
+            self,
+            PrimitiveKind::Bool
+                | PrimitiveKind::Char
+                | PrimitiveKind::StrSlice
+                | PrimitiveKind::StringOwned
+        )
     }
 
     /// Returns `true` if this type is `Copy` in Rust.
@@ -442,12 +472,28 @@ impl PrimitiveKind {
 
     /// Returns `true` if this is a signed integer type.
     pub const fn is_signed_int(self) -> bool {
-        matches!(self, PrimitiveKind::I8 | PrimitiveKind::I16 | PrimitiveKind::I32 | PrimitiveKind::I64 | PrimitiveKind::I128 | PrimitiveKind::Isize)
+        matches!(
+            self,
+            PrimitiveKind::I8
+                | PrimitiveKind::I16
+                | PrimitiveKind::I32
+                | PrimitiveKind::I64
+                | PrimitiveKind::I128
+                | PrimitiveKind::Isize
+        )
     }
 
     /// Returns `true` if this is an unsigned integer type.
     pub const fn is_unsigned_int(self) -> bool {
-        matches!(self, PrimitiveKind::U8 | PrimitiveKind::U16 | PrimitiveKind::U32 | PrimitiveKind::U64 | PrimitiveKind::U128 | PrimitiveKind::Usize)
+        matches!(
+            self,
+            PrimitiveKind::U8
+                | PrimitiveKind::U16
+                | PrimitiveKind::U32
+                | PrimitiveKind::U64
+                | PrimitiveKind::U128
+                | PrimitiveKind::Usize
+        )
     }
 
     /// Attempts to parse a type name string into a `PrimitiveKind`.
@@ -559,10 +605,16 @@ pub struct EnumVariant {
 
 impl EnumVariant {
     pub fn unit(name: impl Into<String>) -> Self {
-        Self { name: name.into(), payload: None }
+        Self {
+            name: name.into(),
+            payload: None,
+        }
     }
     pub fn tuple(name: impl Into<String>, payload: ReflectedType) -> Self {
-        Self { name: name.into(), payload: Some(payload) }
+        Self {
+            name: name.into(),
+            payload: Some(payload),
+        }
     }
 }
 
@@ -619,10 +671,14 @@ impl PropertyValue {
                 PropertyValue::Array(arr.iter().map(PropertyValue::from_json).collect())
             }
             JsonValue::Object(obj) => {
-                let fields = obj.iter()
+                let fields = obj
+                    .iter()
                     .map(|(k, v)| (k.clone(), PropertyValue::from_json(v)))
                     .collect();
-                PropertyValue::Struct { type_path: String::new(), fields }
+                PropertyValue::Struct {
+                    type_path: String::new(),
+                    fields,
+                }
             }
         }
     }
@@ -639,7 +695,8 @@ impl PropertyValue {
             PropertyValue::String(s) => JsonValue::String(s.clone()),
             PropertyValue::Enum { variant, .. } => JsonValue::String(variant.clone()),
             PropertyValue::Struct { fields, .. } => {
-                let obj: serde_json::Map<_, _> = fields.iter()
+                let obj: serde_json::Map<_, _> = fields
+                    .iter()
                     .map(|(k, v)| (k.clone(), v.to_json()))
                     .collect();
                 JsonValue::Object(obj)
@@ -659,7 +716,9 @@ impl PropertyValue {
 }
 
 impl Default for PropertyValue {
-    fn default() -> Self { PropertyValue::Null }
+    fn default() -> Self {
+        PropertyValue::Null
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -772,16 +831,22 @@ pub struct Position {
 impl Position {
     #[inline(always)]
     #[must_use]
-    pub const fn new(x: f64, y: f64) -> Self { Self { x, y } }
+    pub const fn new(x: f64, y: f64) -> Self {
+        Self { x, y }
+    }
 
     #[inline(always)]
     #[must_use]
-    pub const fn zero() -> Self { Self { x: 0.0, y: 0.0 } }
+    pub const fn zero() -> Self {
+        Self { x: 0.0, y: 0.0 }
+    }
 }
 
 impl Default for Position {
     #[inline(always)]
-    fn default() -> Self { Self::zero() }
+    fn default() -> Self {
+        Self::zero()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -814,7 +879,9 @@ impl<'a> TypeParser<'a> {
 
     fn consume(&mut self) -> Option<u8> {
         let b = self.src.as_bytes().get(self.pos).copied();
-        if b.is_some() { self.pos += 1; }
+        if b.is_some() {
+            self.pos += 1;
+        }
         b
     }
 
@@ -854,7 +921,10 @@ impl<'a> TypeParser<'a> {
             Some(b'(') => self.parse_tuple(),
             Some(b'[') => self.parse_array(),
             Some(b'&') => self.parse_ref(),
-            Some(b'?') | Some(b'_') => { self.consume(); ReflectedType::Wildcard }
+            Some(b'?') | Some(b'_') => {
+                self.consume();
+                ReflectedType::Wildcard
+            }
             _ => self.parse_named(),
         }
     }
@@ -864,7 +934,9 @@ impl<'a> TypeParser<'a> {
         let mut elems = Vec::new();
         loop {
             self.skip_ws();
-            if self.consume_if(b')') { break; }
+            if self.consume_if(b')') {
+                break;
+            }
             elems.push(self.parse_type());
             self.skip_ws();
             self.consume_if(b',');
@@ -888,7 +960,10 @@ impl<'a> TypeParser<'a> {
         };
         self.skip_ws();
         self.consume_if(b']');
-        ReflectedType::Array { element: Box::new(element), len }
+        ReflectedType::Array {
+            element: Box::new(element),
+            len,
+        }
     }
 
     fn parse_ref(&mut self) -> ReflectedType {
@@ -897,8 +972,15 @@ impl<'a> TypeParser<'a> {
         let mutable = self.consume_keyword("mut");
         self.skip_ws();
         let inner = self.parse_type();
-        let kind = if mutable { WrapperKind::RefMut } else { WrapperKind::Ref };
-        ReflectedType::Wrapper { kind, inner: Box::new(inner) }
+        let kind = if mutable {
+            WrapperKind::RefMut
+        } else {
+            WrapperKind::Ref
+        };
+        ReflectedType::Wrapper {
+            kind,
+            inner: Box::new(inner),
+        }
     }
 
     fn parse_named(&mut self) -> ReflectedType {
@@ -933,7 +1015,10 @@ impl<'a> TypeParser<'a> {
             self.build_generic(path, args)
         } else {
             // Non-generic named type
-            ReflectedType::Struct { path, generics: vec![] }
+            ReflectedType::Struct {
+                path,
+                generics: vec![],
+            }
         }
     }
 
@@ -964,10 +1049,14 @@ impl<'a> TypeParser<'a> {
         let mut args = Vec::new();
         loop {
             self.skip_ws();
-            if matches!(self.peek(), Some(b'>') | None) { break; }
+            if matches!(self.peek(), Some(b'>') | None) {
+                break;
+            }
             args.push(self.parse_type());
             self.skip_ws();
-            if !self.consume_if(b',') { break; }
+            if !self.consume_if(b',') {
+                break;
+            }
         }
         args
     }
@@ -1004,7 +1093,9 @@ impl<'a> TypeParser<'a> {
                 let error = args.remove(1);
                 let ok = args.remove(0);
                 ReflectedType::Wrapper {
-                    kind: WrapperKind::Result { error: Box::new(error) },
+                    kind: WrapperKind::Result {
+                        error: Box::new(error),
+                    },
                     inner: Box::new(ok),
                 }
             }
@@ -1024,7 +1115,10 @@ impl<'a> TypeParser<'a> {
                     inner: Box::new(val),
                 }
             }
-            _ => ReflectedType::Struct { path, generics: args },
+            _ => ReflectedType::Struct {
+                path,
+                generics: args,
+            },
         }
     }
 }
@@ -1070,20 +1164,35 @@ mod tests {
 
     #[test]
     fn tuple_array_round_trip() {
-        assert_eq!(ReflectedType::parse_str("(f32, f32)").to_type_string(), "(f32, f32)");
-        assert_eq!(ReflectedType::parse_str("[f32; 4]").to_type_string(), "[f32; 4]");
+        assert_eq!(
+            ReflectedType::parse_str("(f32, f32)").to_type_string(),
+            "(f32, f32)"
+        );
+        assert_eq!(
+            ReflectedType::parse_str("[f32; 4]").to_type_string(),
+            "[f32; 4]"
+        );
     }
 
     #[test]
     fn wildcard_round_trip() {
-        assert!(matches!(ReflectedType::parse_str("?"), ReflectedType::Wildcard));
-        assert!(matches!(ReflectedType::parse_str("_"), ReflectedType::Wildcard));
+        assert!(matches!(
+            ReflectedType::parse_str("?"),
+            ReflectedType::Wildcard
+        ));
+        assert!(matches!(
+            ReflectedType::parse_str("_"),
+            ReflectedType::Wildcard
+        ));
     }
 
     #[test]
     fn datatype_reflect() {
         assert!(DataType::typed("f64").reflect().unwrap().is_numeric());
-        assert!(matches!(DataType::any().reflect().unwrap(), ReflectedType::Wildcard));
+        assert!(matches!(
+            DataType::any().reflect().unwrap(),
+            ReflectedType::Wildcard
+        ));
         assert!(DataType::Exec.reflect().is_none());
     }
 

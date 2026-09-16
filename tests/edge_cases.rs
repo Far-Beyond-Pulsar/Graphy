@@ -179,7 +179,12 @@ fn edge_large_wide_graph() {
         node.set_property("b", i as f64);
         graph.add_node(node);
 
-        graph.add_connection(Connection::data("source", "result", format!("fan_{}", i), "a"));
+        graph.add_connection(Connection::data(
+            "source",
+            "result",
+            format!("fan_{}", i),
+            "a",
+        ));
     }
 
     let resolver = DataResolver::build(&graph, &provider).unwrap();
@@ -189,7 +194,10 @@ fn edge_large_wide_graph() {
     // Source should come before all fan-out nodes
     let source_pos = order.iter().position(|x| x == "source").unwrap();
     for i in 0..100 {
-        let fan_pos = order.iter().position(|x| x == &format!("fan_{}", i)).unwrap();
+        let fan_pos = order
+            .iter()
+            .position(|x| x == &format!("fan_{}", i))
+            .unwrap();
         assert!(source_pos < fan_pos);
     }
 }
@@ -224,7 +232,9 @@ fn edge_node_type_not_in_provider() {
     let resolver = DataResolver::build(&graph, &provider).unwrap();
 
     // Not in pure order since metadata lookup fails
-    assert!(!resolver.get_pure_evaluation_order().contains(&"unknown_1".to_string()));
+    assert!(!resolver
+        .get_pure_evaluation_order()
+        .contains(&"unknown_1".to_string()));
 
     // But it should still have input sources and variable names
     assert!(resolver.get_input_source("unknown_1", "x").is_some());

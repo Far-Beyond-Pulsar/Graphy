@@ -48,7 +48,9 @@ pub const DOCUMENT_FORMAT_VERSION: u32 = 2;
 pub struct GraphId(pub String);
 
 impl GraphId {
-    pub fn main() -> Self { Self("main".to_string()) }
+    pub fn main() -> Self {
+        Self("main".to_string())
+    }
 
     pub fn macro_id(uuid: impl Into<String>) -> Self {
         Self(format!("macro:{}", uuid.into()))
@@ -58,13 +60,21 @@ impl GraphId {
         Self(format!("collapsed:{}", uuid.into()))
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 
-    pub fn is_main(&self) -> bool { self.0 == "main" }
+    pub fn is_main(&self) -> bool {
+        self.0 == "main"
+    }
 
-    pub fn is_macro(&self) -> bool { self.0.starts_with("macro:") }
+    pub fn is_macro(&self) -> bool {
+        self.0.starts_with("macro:")
+    }
 
-    pub fn is_collapsed(&self) -> bool { self.0.starts_with("collapsed:") }
+    pub fn is_collapsed(&self) -> bool {
+        self.0.starts_with("collapsed:")
+    }
 }
 
 impl std::fmt::Display for GraphId {
@@ -74,11 +84,15 @@ impl std::fmt::Display for GraphId {
 }
 
 impl From<&str> for GraphId {
-    fn from(s: &str) -> Self { Self(s.to_string()) }
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
 }
 
 impl From<String> for GraphId {
-    fn from(s: String) -> Self { Self(s) }
+    fn from(s: String) -> Self {
+        Self(s)
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,15 +126,21 @@ pub enum GraphKind {
 /// target these interface pins by ID.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GraphInterface {
-    pub inputs:  Vec<InterfacePin>,
+    pub inputs: Vec<InterfacePin>,
     pub outputs: Vec<InterfacePin>,
 }
 
 impl GraphInterface {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn add_input(&mut self, pin: InterfacePin) { self.inputs.push(pin); }
-    pub fn add_output(&mut self, pin: InterfacePin) { self.outputs.push(pin); }
+    pub fn add_input(&mut self, pin: InterfacePin) {
+        self.inputs.push(pin);
+    }
+    pub fn add_output(&mut self, pin: InterfacePin) {
+        self.outputs.push(pin);
+    }
 }
 
 /// A single pin on a graph's public interface.
@@ -279,7 +299,8 @@ impl Graph {
         let node = self.nodes.remove(id);
         if node.is_some() {
             // Remove all connections that touch this node
-            self.connections.retain(|c| c.source_node != id && c.target_node != id);
+            self.connections
+                .retain(|c| c.source_node != id && c.target_node != id);
         }
         node
     }
@@ -301,11 +322,15 @@ impl Graph {
         let mut gd = GraphDescription::new(self.metadata.name.clone());
         gd.nodes = self.nodes.clone();
         gd.connections = self.connections.clone();
-        gd.comments = self.comments.iter().map(|c| LegacyComment {
-            text: c.text.clone(),
-            position: c.position,
-            size: c.size,
-        }).collect();
+        gd.comments = self
+            .comments
+            .iter()
+            .map(|c| LegacyComment {
+                text: c.text.clone(),
+                position: c.position,
+                size: c.size,
+            })
+            .collect();
         gd
     }
 }
@@ -336,7 +361,11 @@ pub struct ClassVariable {
 }
 
 impl ClassVariable {
-    pub fn new(id: impl Into<String>, name: impl Into<String>, type_string: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        type_string: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             name: name.into(),
@@ -394,7 +423,11 @@ pub struct GraphViewState {
 
 impl Default for GraphViewState {
     fn default() -> Self {
-        Self { pan_x: 0.0, pan_y: 0.0, zoom: 1.0 }
+        Self {
+            pan_x: 0.0,
+            pan_y: 0.0,
+            zoom: 1.0,
+        }
     }
 }
 
@@ -481,14 +514,16 @@ impl BlueprintDocument {
     /// Panics if the entry graph is missing (documents from [`Self::new`]
     /// always have a valid entry graph).
     pub fn entry_graph(&self) -> &Graph {
-        self.graphs.get(self.entry_graph.as_str())
+        self.graphs
+            .get(self.entry_graph.as_str())
             .expect("BlueprintDocument: entry_graph ID points to a missing graph")
     }
 
     /// Returns a mutable reference to the root event graph.
     pub fn entry_graph_mut(&mut self) -> &mut Graph {
         let id = self.entry_graph.as_str().to_string();
-        self.graphs.get_mut(&id)
+        self.graphs
+            .get_mut(&id)
             .expect("BlueprintDocument: entry_graph ID points to a missing graph")
     }
 
@@ -536,13 +571,18 @@ impl BlueprintDocument {
         let root = doc.entry_graph_mut();
         root.nodes = gd.nodes;
         root.connections = gd.connections;
-        root.comments = gd.comments.into_iter().enumerate().map(|(i, c)| GraphComment {
-            id: format!("comment_{}", i),
-            text: c.text,
-            position: c.position,
-            size: c.size,
-            contained_node_ids: Vec::new(),
-        }).collect();
+        root.comments = gd
+            .comments
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| GraphComment {
+                id: format!("comment_{}", i),
+                text: c.text,
+                position: c.position,
+                size: c.size,
+                contained_node_ids: Vec::new(),
+            })
+            .collect();
         root.metadata = gd.metadata;
         doc
     }

@@ -164,8 +164,14 @@ fn data_resolver_linear_chain_order() {
 
     // node_0 must come before node_1, node_1 before node_2, etc.
     for i in 0..4 {
-        let pos_i = order.iter().position(|x| x == &format!("node_{}", i)).unwrap();
-        let pos_next = order.iter().position(|x| x == &format!("node_{}", i + 1)).unwrap();
+        let pos_i = order
+            .iter()
+            .position(|x| x == &format!("node_{}", i))
+            .unwrap();
+        let pos_next = order
+            .iter()
+            .position(|x| x == &format!("node_{}", i + 1))
+            .unwrap();
         assert!(
             pos_i < pos_next,
             "node_{} (pos {}) should come before node_{} (pos {})",

@@ -49,7 +49,7 @@ pub enum DataSource {
     Connection {
         /// ID of the source node
         source_node_id: String,
-        
+
         /// ID of the output pin on the source node
         source_pin: String,
     },
@@ -113,7 +113,7 @@ impl DataResolver {
     /// use graphy::{DataResolver, GraphDescription};
     ///
     /// let resolver = DataResolver::build(&graph, &provider)?;
-    /// 
+    ///
     /// // Query the resolver
     /// let eval_order = resolver.get_pure_evaluation_order();
     /// ```
@@ -139,16 +139,13 @@ impl DataResolver {
         // Pre-allocate with estimated capacity for better performance
         let node_count = graph.nodes.len();
         let connection_count = graph.connections.len();
-        
+
         let mut resolver = DataResolver {
             input_sources: FxHashMap::with_capacity_and_hasher(
-                connection_count * 2, 
-                Default::default()
+                connection_count * 2,
+                Default::default(),
             ),
-            result_variables: FxHashMap::with_capacity_and_hasher(
-                node_count, 
-                Default::default()
-            ),
+            result_variables: FxHashMap::with_capacity_and_hasher(node_count, Default::default()),
             pure_evaluation_order: Vec::with_capacity(node_count / 4), // Estimate ~25% pure nodes
         };
 
@@ -161,7 +158,10 @@ impl DataResolver {
         resolver.generate_variable_names(graph);
         compiler_debug(
             "data_flow",
-            format!("Generated {} result variable names", resolver.result_variables.len()),
+            format!(
+                "Generated {} result variable names",
+                resolver.result_variables.len()
+            ),
         );
 
         // Phase 3: Determine evaluation order for pure nodes
@@ -235,22 +235,19 @@ impl DataResolver {
         // Pre-allocate with estimated capacity for better performance
         let node_count = graph.nodes.len();
         let connection_count = graph.connections.len();
-        
+
         let mut resolver = DataResolver {
             input_sources: FxHashMap::with_capacity_and_hasher(
-                connection_count * 2, 
-                Default::default()
+                connection_count * 2,
+                Default::default(),
             ),
-            result_variables: FxHashMap::with_capacity_and_hasher(
-                node_count, 
-                Default::default()
-            ),
+            result_variables: FxHashMap::with_capacity_and_hasher(node_count, Default::default()),
             pure_evaluation_order: Vec::with_capacity(node_count / 4), // Estimate ~25% pure nodes
         };
 
         // Use the pre-warmed thread pool
         let pool = crate::parallel::get_thread_pool();
-        
+
         pool.install(|| {
             // Phase 1: Map all data connections (parallel)
             resolver.map_data_connections_parallel(graph)?;
@@ -283,7 +280,10 @@ impl DataResolver {
 
         for connection in &graph.connections {
             if matches!(connection.connection_type, ConnectionType::Data) {
-                let key = (connection.target_node.clone(), connection.target_pin.clone());
+                let key = (
+                    connection.target_node.clone(),
+                    connection.target_pin.clone(),
+                );
                 let source = DataSource::Connection {
                     source_node_id: connection.source_node.clone(),
                     source_pin: connection.source_pin.clone(),
@@ -372,13 +372,20 @@ impl DataResolver {
     }
 
     /// Parallel version: Map data connections using rayon
-    fn map_data_connections_parallel(&mut self, graph: &GraphDescription) -> Result<(), GraphyError> {
+    fn map_data_connections_parallel(
+        &mut self,
+        graph: &GraphDescription,
+    ) -> Result<(), GraphyError> {
         // Process data connections in parallel
-        let data_sources: Vec<_> = graph.connections
+        let data_sources: Vec<_> = graph
+            .connections
             .par_iter()
             .filter(|c| matches!(c.connection_type, ConnectionType::Data))
             .map(|connection| {
-                let key = (connection.target_node.clone(), connection.target_pin.clone());
+                let key = (
+                    connection.target_node.clone(),
+                    connection.target_pin.clone(),
+                );
                 let source = DataSource::Connection {
                     source_node_id: connection.source_node.clone(),
                     source_pin: connection.source_pin.clone(),
@@ -390,7 +397,8 @@ impl DataResolver {
         self.input_sources.extend(data_sources);
 
         // Process unconnected inputs in parallel
-        let default_sources: Vec<_> = graph.nodes
+        let default_sources: Vec<_> = graph
+            .nodes
             .par_iter()
             .flat_map(|(node_id, node)| {
                 node.inputs
@@ -398,9 +406,12 @@ impl DataResolver {
                     .filter_map(|pin_instance| {
                         let pin_name = &pin_instance.id;
                         let key = (node_id.clone(), pin_name.clone());
-                        
+
                         if let Some(prop_value) = node.properties.get(pin_name) {
-                            Some((key, DataSource::Constant(property_value_to_string(prop_value))))
+                            Some((
+                                key,
+                                DataSource::Constant(property_value_to_string(prop_value)),
+                            ))
                         } else {
                             Some((key, DataSource::Default))
                         }
@@ -413,13 +424,14 @@ impl DataResolver {
         for (key, source) in default_sources {
             self.input_sources.entry(key).or_insert(source);
         }
-        
+
         Ok(())
     }
 
     /// Parallel version: Generate variable names using rayon
     fn generate_variable_names_parallel(&mut self, graph: &GraphDescription) {
-        let var_names: Vec<_> = graph.nodes
+        let var_names: Vec<_> = graph
+            .nodes
             .par_iter()
             .map(|(node_id, _node)| {
                 let var_name = format!("node_{}_result", sanitize_var_name(node_id));
@@ -437,9 +449,9 @@ impl DataResolver {
         metadata_provider: &P,
     ) -> Result<(), GraphyError> {
         let node_count = graph.nodes.len();
-        
+
         // Build dependency graph for pure nodes with pre-allocated capacity
-        let mut dependencies: FxHashMap<String, Vec<String>> = 
+        let mut dependencies: FxHashMap<String, Vec<String>> =
             FxHashMap::with_capacity_and_hasher(node_count / 2, Default::default());
         let mut pure_nodes: HashSet<String> = HashSet::with_capacity(node_count / 2);
 
@@ -457,17 +469,17 @@ impl DataResolver {
         for connection in &graph.connections {
             if matches!(connection.connection_type, ConnectionType::Data)
                 && pure_nodes.contains(&connection.target_node)
-                    && pure_nodes.contains(&connection.source_node)
-                {
-                    dependencies
-                        .entry(connection.target_node.clone())
-                        .or_default()
-                        .push(connection.source_node.clone());
-                }
+                && pure_nodes.contains(&connection.source_node)
+            {
+                dependencies
+                    .entry(connection.target_node.clone())
+                    .or_default()
+                    .push(connection.source_node.clone());
+            }
         }
 
         // Build reverse dependency map with pre-allocated capacity
-        let mut dependents: FxHashMap<String, Vec<String>> = 
+        let mut dependents: FxHashMap<String, Vec<String>> =
             FxHashMap::with_capacity_and_hasher(pure_nodes.len(), Default::default());
         for (target, sources) in &dependencies {
             for source in sources {
@@ -479,7 +491,7 @@ impl DataResolver {
         }
 
         // Topological sort using Kahn's algorithm
-        let mut in_degree: FxHashMap<String, usize> = 
+        let mut in_degree: FxHashMap<String, usize> =
             FxHashMap::with_capacity_and_hasher(pure_nodes.len(), Default::default());
         for node_id in &pure_nodes {
             let num_deps = dependencies.get(node_id).map(|v| v.len()).unwrap_or(0);
@@ -569,7 +581,8 @@ impl DataResolver {
     /// ```
     #[inline(always)]
     pub fn get_input_source(&self, node_id: &str, pin_name: &str) -> Option<&DataSource> {
-        self.input_sources.get(&(node_id.to_string(), pin_name.to_string()))
+        self.input_sources
+            .get(&(node_id.to_string(), pin_name.to_string()))
     }
 
     /// Retrieves the generated variable name for a node's result.
@@ -628,7 +641,11 @@ fn property_value_to_string(value: &JsonValue) -> String {
         }
         JsonValue::Bool(b) => b.to_string(),
         JsonValue::Array(items) if items.len() == 2 => {
-            format!("({}, {})", property_value_to_string(&items[0]), property_value_to_string(&items[1]))
+            format!(
+                "({}, {})",
+                property_value_to_string(&items[0]),
+                property_value_to_string(&items[1])
+            )
         }
         JsonValue::Array(items) if items.len() == 3 => {
             format!(
@@ -654,7 +671,13 @@ fn property_value_to_string(value: &JsonValue) -> String {
 /// Sanitize a string to be a valid variable name
 fn sanitize_var_name(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 

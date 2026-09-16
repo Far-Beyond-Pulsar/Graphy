@@ -67,8 +67,7 @@ fn node_metadata_builder_pattern() {
 
 #[test]
 fn node_metadata_with_return_type_str() {
-    let meta = NodeMetadata::new("add", NodeTypes::pure, "math")
-        .with_return_type("i64");
+    let meta = NodeMetadata::new("add", NodeTypes::pure, "math").with_return_type("i64");
     assert!(meta.return_type.is_some());
     assert_eq!(meta.return_type.unwrap().type_string, "i64");
 }
@@ -76,14 +75,18 @@ fn node_metadata_with_return_type_str() {
 #[test]
 fn node_metadata_with_return_type_typeinfo() {
     let ti = core::TypeInfo::new("(f32, f32)");
-    let meta = NodeMetadata::new("pos", NodeTypes::pure, "math")
-        .with_return_type(ti);
+    let meta = NodeMetadata::new("pos", NodeTypes::pure, "math").with_return_type(ti);
     assert_eq!(meta.return_type.unwrap().type_string, "(f32, f32)");
 }
 
 #[test]
 fn node_metadata_all_node_types() {
-    for nt in [NodeTypes::pure, NodeTypes::fn_, NodeTypes::control_flow, NodeTypes::event] {
+    for nt in [
+        NodeTypes::pure,
+        NodeTypes::fn_,
+        NodeTypes::control_flow,
+        NodeTypes::event,
+    ] {
         let meta = NodeMetadata::new("test", nt, "test");
         assert_eq!(meta.node_type, nt);
     }

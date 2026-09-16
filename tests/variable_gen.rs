@@ -1,6 +1,6 @@
 //! Tests for VariableNameGenerator, sanitize_name, and get_default_value_for_type.
 
-use graphy::utils::{VariableNameGenerator, sanitize_name, get_default_value_for_type};
+use graphy::utils::{get_default_value_for_type, sanitize_name, VariableNameGenerator};
 
 // ===========================================================================
 // VariableNameGenerator - Basic
@@ -218,8 +218,5 @@ fn default_unknown_type_uses_default_trait() {
 
 #[test]
 fn default_vec_uses_default_trait() {
-    assert_eq!(
-        get_default_value_for_type("Vec<u8>"),
-        "Default::default()"
-    );
+    assert_eq!(get_default_value_for_type("Vec<u8>"), "Default::default()");
 }

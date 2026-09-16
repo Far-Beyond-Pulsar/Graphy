@@ -3,9 +3,9 @@
 //! Pre-configured thread pools for parallel graph processing.
 //! Eliminates cold-start overhead by warming up threads in advance.
 
+use crate::{compiler_debug, compiler_info};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::OnceLock;
-use crate::{compiler_debug, compiler_info};
 
 /// Global thread pool for graph analysis
 static GRAPH_POOL: OnceLock<ThreadPool> = OnceLock::new();
@@ -15,13 +15,13 @@ static GRAPH_POOL: OnceLock<ThreadPool> = OnceLock::new();
 pub struct ThreadPoolConfig {
     /// Number of threads to use (None = auto-detect)
     pub num_threads: Option<usize>,
-    
+
     /// Stack size per thread in bytes
     pub stack_size: Option<usize>,
-    
+
     /// Thread name prefix
     pub thread_name: String,
-    
+
     /// Whether to use LIFO work stealing (better cache locality)
     pub breadth_first: bool,
 }
@@ -29,7 +29,7 @@ pub struct ThreadPoolConfig {
 impl Default for ThreadPoolConfig {
     fn default() -> Self {
         Self {
-            num_threads: None, // Auto-detect
+            num_threads: None,                 // Auto-detect
             stack_size: Some(2 * 1024 * 1024), // 2MB per thread
             thread_name: "graphy-worker".to_string(),
             breadth_first: false, // LIFO for better cache locality
@@ -42,25 +42,25 @@ impl ThreadPoolConfig {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Set the number of threads
     pub fn with_num_threads(mut self, num: usize) -> Self {
         self.num_threads = Some(num);
         self
     }
-    
+
     /// Set the stack size per thread
     pub fn with_stack_size(mut self, size: usize) -> Self {
         self.stack_size = Some(size);
         self
     }
-    
+
     /// Enable breadth-first work stealing
     pub fn with_breadth_first(mut self, enabled: bool) -> Self {
         self.breadth_first = enabled;
         self
     }
-    
+
     /// Get the actual number of threads that will be used
     pub fn get_num_threads(&self) -> usize {
         self.num_threads.unwrap_or_else(|| {
@@ -91,7 +91,7 @@ impl ThreadPoolConfig {
 /// ```
 pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
     let num_threads = config.get_num_threads();
-    
+
     compiler_info(
         "threadpool",
         format!(
@@ -99,15 +99,15 @@ pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
             num_threads, config.stack_size, config.breadth_first
         ),
     );
-    
+
     let mut builder = ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .thread_name(move |idx| format!("{}-{}", config.thread_name, idx));
-    
+
     if let Some(stack_size) = config.stack_size {
         builder = builder.stack_size(stack_size);
     }
-    
+
     if config.breadth_first {
         // Note: breadth_first is deprecated, but we keep the option for compatibility
         #[allow(deprecated)]
@@ -115,9 +115,11 @@ pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
             builder = builder.breadth_first();
         }
     }
-    
-    let pool = builder.build().map_err(|e| format!("Failed to build thread pool: {}", e))?;
-    
+
+    let pool = builder
+        .build()
+        .map_err(|e| format!("Failed to build thread pool: {}", e))?;
+
     // Warm up the pool by running a dummy task on each thread
     pool.install(|| {
         (0..num_threads).into_par_iter().for_each(|_| {
@@ -125,11 +127,13 @@ pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
             std::hint::black_box(42);
         });
     });
-    
+
     compiler_info("threadpool", "Thread pool warmed up and ready");
-    
-    GRAPH_POOL.set(pool).map_err(|_| "Thread pool already initialized".to_string())?;
-    
+
+    GRAPH_POOL
+        .set(pool)
+        .map_err(|_| "Thread pool already initialized".to_string())?;
+
     Ok(())
 }
 
@@ -139,10 +143,10 @@ pub fn init_thread_pool(config: ThreadPoolConfig) -> Result<(), String> {
 pub fn get_thread_pool() -> &'static ThreadPool {
     GRAPH_POOL.get_or_init(|| {
         compiler_debug("threadpool", "Lazy initializing with defaults");
-        
+
         let config = ThreadPoolConfig::default();
         let num_threads = config.get_num_threads();
-        
+
         ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .thread_name(move |idx| format!("graphy-worker-{}", idx))
@@ -168,13 +172,13 @@ pub use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, Parallel
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_thread_pool_config() {
         let config = ThreadPoolConfig::new()
             .with_num_threads(8)
             .with_stack_size(4 * 1024 * 1024);
-        
+
         assert_eq!(config.get_num_threads(), 8);
         assert_eq!(config.stack_size, Some(4 * 1024 * 1024));
     }

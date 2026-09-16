@@ -10,8 +10,8 @@
 //!
 //! Uses `FxHashMap` for faster routing table lookups.
 
-use crate::core::{GraphDescription, ConnectionType};
 use crate::compiler_info;
+use crate::core::{ConnectionType, GraphDescription};
 use rustc_hash::FxHashMap;
 
 /// Execution routing table.
@@ -38,14 +38,14 @@ impl ExecutionRouting {
     /// use graphy::{ExecutionRouting, GraphDescription};
     ///
     /// let routing = ExecutionRouting::build_from_graph(&graph);
-    /// 
+    ///
     /// // Query which nodes execute after "start" node's "exec" pin
     /// let next_nodes = routing.get_connected_nodes("start", "exec");
     /// ```
     pub fn build_from_graph(graph: &GraphDescription) -> Self {
         // Pre-allocate with estimated capacity
         let connection_count = graph.connections.len();
-        let mut routes: FxHashMap<(String, String), Vec<String>> = 
+        let mut routes: FxHashMap<(String, String), Vec<String>> =
             FxHashMap::with_capacity_and_hasher(connection_count / 2, Default::default());
 
         for connection in &graph.connections {
@@ -127,7 +127,9 @@ mod tests {
         graph.add_node(node2);
 
         // Add execution connection
-        graph.add_connection(Connection::execution("node1", "exec_out", "node2", "exec_in"));
+        graph.add_connection(Connection::execution(
+            "node1", "exec_out", "node2", "exec_in",
+        ));
 
         // Build routing
         let routing = ExecutionRouting::build_from_graph(&graph);

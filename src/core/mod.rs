@@ -2,20 +2,20 @@
 //!
 //! Fundamental types for representing node graphs.
 
-mod graph;
-mod node;
 mod connection;
-mod types;
-mod metadata;
 pub mod document;
+mod graph;
+mod metadata;
+mod node;
+mod types;
 
-pub use graph::*;
-pub use node::*;
 pub use connection::*;
-pub use types::*;
-pub use metadata::*;
 pub use document::{
-    BlueprintDocument, BlueprintMetadata, ClassVariable, DocumentEditorState,
-    Graph, GraphComment as DocumentGraphComment, GraphId, GraphInterface,
-    GraphKind, GraphViewState, InterfacePin, DOCUMENT_FORMAT_VERSION,
+    BlueprintDocument, BlueprintMetadata, ClassVariable, DocumentEditorState, Graph,
+    GraphComment as DocumentGraphComment, GraphId, GraphInterface, GraphKind, GraphViewState,
+    InterfacePin, DOCUMENT_FORMAT_VERSION,
 };
+pub use graph::*;
+pub use metadata::*;
+pub use node::*;
+pub use types::*;

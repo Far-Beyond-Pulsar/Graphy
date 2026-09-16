@@ -40,16 +40,16 @@ use std::collections::HashMap;
 pub struct GraphMetadata {
     /// Human-readable name of the graph
     pub name: String,
-    
+
     /// Optional description of the graph's purpose
     pub description: String,
-    
+
     /// Semantic version string (e.g., "1.0.0")
     pub version: String,
-    
+
     /// ISO 8601 timestamp of creation
     pub created_at: String,
-    
+
     /// ISO 8601 timestamp of last modification
     pub modified_at: String,
 }
@@ -113,10 +113,10 @@ pub struct GraphDescription {
 pub struct GraphComment {
     /// The comment text content
     pub text: String,
-    
+
     /// Position in the visual editor
     pub position: super::Position,
-    
+
     /// Size of the comment box (width, height)
     pub size: (f64, f64),
 }
@@ -201,9 +201,8 @@ impl GraphDescription {
     /// Returns `true` if the node existed.
     pub fn remove_node(&mut self, id: &str) -> bool {
         let existed = self.nodes.remove(id).is_some();
-        self.connections.retain(|c|
-            c.source_node != id && c.target_node != id
-        );
+        self.connections
+            .retain(|c| c.source_node != id && c.target_node != id);
         existed
     }
 

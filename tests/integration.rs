@@ -21,7 +21,9 @@ fn pipeline_linear_chain_data_flow_and_routing() {
 
     // All nodes should have result variables
     for i in 0..10 {
-        assert!(resolver.get_result_variable(&format!("node_{}", i)).is_some());
+        assert!(resolver
+            .get_result_variable(&format!("node_{}", i))
+            .is_some());
     }
 
     // Execution routing should be empty (pure nodes only)
@@ -44,7 +46,10 @@ fn pipeline_diamond_data_flow() {
     // node_b.a should come from node_a.result
     let b_input = resolver.get_input_source("node_b", "a").unwrap();
     match b_input {
-        DataSource::Connection { source_node_id, source_pin } => {
+        DataSource::Connection {
+            source_node_id,
+            source_pin,
+        } => {
             assert_eq!(source_node_id, "node_a");
             assert_eq!(source_pin, "result");
         }

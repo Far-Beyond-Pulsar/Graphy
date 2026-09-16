@@ -3,9 +3,9 @@
 //! This example creates increasingly complex graphs to test performance characteristics.
 
 use graphy::{
-    GraphDescription, NodeInstance, Connection, Pin, PinInstance, PinType,
-    DataType, NodeTypes, ConnectionType, Position,
-    DataResolver, ExecutionRouting, NodeMetadata, ParamInfo, NodeMetadataProvider,
+    Connection, ConnectionType, DataResolver, DataType, ExecutionRouting, GraphDescription,
+    NodeInstance, NodeMetadata, NodeMetadataProvider, NodeTypes, ParamInfo, Pin, PinInstance,
+    PinType, Position,
 };
 use std::collections::HashMap;
 use std::time::Instant;
@@ -22,10 +22,7 @@ impl StressTestProvider {
         metadata.insert(
             "math.add".to_string(),
             NodeMetadata::new("add", NodeTypes::pure, "Math")
-                .with_params(vec![
-                    ParamInfo::new("a", "f64"),
-                    ParamInfo::new("b", "f64"),
-                ])
+                .with_params(vec![ParamInfo::new("a", "f64"), ParamInfo::new("b", "f64")])
                 .with_return_type("f64")
                 .with_source("a + b"),
         );
@@ -33,10 +30,7 @@ impl StressTestProvider {
         metadata.insert(
             "math.multiply".to_string(),
             NodeMetadata::new("multiply", NodeTypes::pure, "Math")
-                .with_params(vec![
-                    ParamInfo::new("a", "f64"),
-                    ParamInfo::new("b", "f64"),
-                ])
+                .with_params(vec![ParamInfo::new("a", "f64"), ParamInfo::new("b", "f64")])
                 .with_return_type("f64")
                 .with_source("a * b"),
         );
@@ -62,7 +56,8 @@ impl NodeMetadataProvider for StressTestProvider {
     }
 
     fn get_nodes_by_category(&self, category: &str) -> Vec<&NodeMetadata> {
-        self.metadata.values()
+        self.metadata
+            .values()
             .filter(|m| m.category == category)
             .collect()
     }
@@ -72,7 +67,12 @@ impl NodeMetadataProvider for StressTestProvider {
 fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
     let mut graph = GraphDescription::new(format!("stress_grid_{}x{}", width, height));
 
-    println!("Creating {}x{} grid ({} nodes)...", width, height, width * height);
+    println!(
+        "Creating {}x{} grid ({} nodes)...",
+        width,
+        height,
+        width * height
+    );
 
     // Create grid nodes
     for row in 0..height {
@@ -80,18 +80,33 @@ fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
             let node_id = format!("n_{}_{}", row, col);
             let mut node = NodeInstance::new(
                 &node_id,
-                if (row + col) % 2 == 0 { "math.add" } else { "math.multiply" },
-                Position::new(col as f64 * 100.0, row as f64 * 100.0)
+                if (row + col) % 2 == 0 {
+                    "math.add"
+                } else {
+                    "math.multiply"
+                },
+                Position::new(col as f64 * 100.0, row as f64 * 100.0),
             );
 
-            node.inputs.push(PinInstance::new("a", Pin::new("a", "A", DataType::typed("f64"), PinType::Input)));
-            node.inputs.push(PinInstance::new("b", Pin::new("b", "B", DataType::typed("f64"), PinType::Input)));
-            node.outputs.push(PinInstance::new("result", Pin::new("result", "Result", DataType::typed("f64"), PinType::Output)));
+            node.inputs.push(PinInstance::new(
+                "a",
+                Pin::new("a", "A", DataType::typed("f64"), PinType::Input),
+            ));
+            node.inputs.push(PinInstance::new(
+                "b",
+                Pin::new("b", "B", DataType::typed("f64"), PinType::Input),
+            ));
+            node.outputs.push(PinInstance::new(
+                "result",
+                Pin::new("result", "Result", DataType::typed("f64"), PinType::Output),
+            ));
 
             // Edge nodes have constants
             if col == 0 || row == 0 {
-                node.properties.insert("a".to_string(), serde_json::json!((row + col) as f64));
-                node.properties.insert("b".to_string(), serde_json::json!(1.0));
+                node.properties
+                    .insert("a".to_string(), serde_json::json!((row + col) as f64));
+                node.properties
+                    .insert("b".to_string(), serde_json::json!(1.0));
             }
 
             graph.add_node(node);
@@ -158,7 +173,11 @@ fn run_stress_test(name: &str, graph: &GraphDescription, provider: &StressTestPr
     let start = Instant::now();
     let json = serde_json::to_string(&graph).unwrap();
     let serialize_time = start.elapsed();
-    println!("  📄 Serialization: {:?} ({} bytes)", serialize_time, json.len());
+    println!(
+        "  📄 Serialization: {:?} ({} bytes)",
+        serialize_time,
+        json.len()
+    );
 
     let start = Instant::now();
     let _: GraphDescription = serde_json::from_str(&json).unwrap();
@@ -174,7 +193,10 @@ fn run_stress_test(name: &str, graph: &GraphDescription, provider: &StressTestPr
         }
         Err(e) => {
             let analysis_time = start.elapsed();
-            println!("  ❌ Data Flow Analysis Failed: {:?} after {:?}", e, analysis_time);
+            println!(
+                "  ❌ Data Flow Analysis Failed: {:?} after {:?}",
+                e, analysis_time
+            );
         }
     }
 
@@ -187,7 +209,10 @@ fn run_stress_test(name: &str, graph: &GraphDescription, provider: &StressTestPr
         }
         Err(e) => {
             let analysis_time = start.elapsed();
-            println!("  ❌ Parallel Analysis Failed: {:?} after {:?}", e, analysis_time);
+            println!(
+                "  ❌ Parallel Analysis Failed: {:?} after {:?}",
+                e, analysis_time
+            );
         }
     }
 
@@ -211,12 +236,12 @@ fn main() {
     let num_cpus = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4);
-    
+
     use graphy::parallel::{init_thread_pool, ThreadPoolConfig};
     let config = ThreadPoolConfig::new()
         .with_num_threads(num_cpus)
         .with_stack_size(2 * 1024 * 1024);
-    
+
     init_thread_pool(config).expect("Failed to initialize thread pool");
     println!("✅ Thread pool ready with {} threads\n", num_cpus);
 
@@ -237,7 +262,7 @@ fn main() {
     // Test 4: Extra large (if you dare!)
     println!("\n⚠️  Warning: The next test creates a MASSIVE graph!");
     println!("This may take significant time and memory...\n");
-    
+
     let graph_200x200 = create_stress_grid(200, 200);
     run_stress_test("🚨 EXTREME: 200x200 Grid", &graph_200x200, &provider);
 
@@ -249,7 +274,7 @@ fn main() {
     let start = Instant::now();
     let monster = create_stress_grid(200, 200);
     let creation_time = start.elapsed();
-    
+
     println!("\n  Graph creation took: {:?}", creation_time);
     run_stress_test("💀 THE MONSTER", &monster, &provider);
 

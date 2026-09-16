@@ -1,6 +1,6 @@
 //! Tests for AST transformation: inline_control_flow_function, extract_exec_output_labels.
 
-use graphy::utils::{inline_control_flow_function, extract_exec_output_labels};
+use graphy::utils::{extract_exec_output_labels, inline_control_flow_function};
 use std::collections::HashMap;
 
 // ===========================================================================
@@ -180,22 +180,15 @@ fn inline_empty_replacements_erases_exec_output_macros() {
 
 #[test]
 fn inline_invalid_source_returns_error() {
-    let result = inline_control_flow_function(
-        "not valid rust code",
-        HashMap::new(),
-        HashMap::new(),
-    );
+    let result =
+        inline_control_flow_function("not valid rust code", HashMap::new(), HashMap::new());
     assert!(result.is_err());
 }
 
 #[test]
 fn inline_no_function_body_returns_error() {
     // A valid statement but not a function
-    let result = inline_control_flow_function(
-        "let x = 5;",
-        HashMap::new(),
-        HashMap::new(),
-    );
+    let result = inline_control_flow_function("let x = 5;", HashMap::new(), HashMap::new());
     assert!(result.is_err());
 }
 
@@ -288,7 +281,10 @@ fn regression_sequence_single_stmt_per_output() {
     assert!(code.contains("bar"), "Then1 stmt missing: {code}");
     assert!(code.contains("baz"), "Then2 stmt missing: {code}");
     assert!(code.contains("qux"), "Then3 stmt missing: {code}");
-    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! in output: {code}"
+    );
 }
 
 /// Regression: multi-statement replacement — ALL statements must appear, not just the first.
@@ -323,14 +319,23 @@ fn regression_sequence_multi_stmt_chain_all_emitted() {
         print_number_count >= 2,
         "Then0 should have 2× print_number, got {print_number_count}: {code}"
     );
-    assert!(code.contains("println"),         "3rd stmt of Then0 (println) missing: {code}");
-    assert!(code.contains("print_formatted"), "4th stmt of Then0 (print_formatted) missing: {code}");
+    assert!(
+        code.contains("println"),
+        "3rd stmt of Then0 (println) missing: {code}"
+    );
+    assert!(
+        code.contains("print_formatted"),
+        "4th stmt of Then0 (print_formatted) missing: {code}"
+    );
 
     // Then1's single stmt must also be present.
-    assert!(code.contains("print_bool"),      "Then1 stmt missing: {code}");
+    assert!(code.contains("print_bool"), "Then1 stmt missing: {code}");
 
     // No bare exec_output! should survive into the output.
-    assert!(!code.contains("exec_output"),    "bare exec_output! in output: {code}");
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! in output: {code}"
+    );
 }
 
 /// Regression: unconnected outputs (no replacement key) must produce empty code,
@@ -345,8 +350,11 @@ fn regression_unconnected_outputs_erased_not_emitted() {
     let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
         .expect("inline failed");
 
-    assert!(code.contains("connected"),    "Then0 stmt missing: {code}");
-    assert!(!code.contains("exec_output"), "bare exec_output! survived: {code}");
+    assert!(code.contains("connected"), "Then0 stmt missing: {code}");
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! survived: {code}"
+    );
 }
 
 /// Regression: empty-string replacement (explicitly empty) must also not emit exec_output!.
@@ -361,8 +369,11 @@ fn regression_empty_string_replacement_erased() {
     let code = inline_control_flow_function(SEQUENCE_SOURCE, exec_replacements, HashMap::new())
         .expect("inline failed");
 
-    assert!(code.contains("do_work"),      "Then0 stmt missing: {code}");
-    assert!(!code.contains("exec_output"), "bare exec_output! survived: {code}");
+    assert!(code.contains("do_work"), "Then0 stmt missing: {code}");
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! survived: {code}"
+    );
 }
 
 /// Regression: fully unconnected Sequence (nothing wired up) produces
@@ -406,11 +417,20 @@ fn regression_six_node_blueprint_all_calls_emitted() {
         .expect("inline failed");
 
     // Both Sequence branches must be emitted.
-    assert!(code.contains("print_bool"),   "Then0 (print_bool) missing: {code}");
-    assert!(code.contains("print_number"), "Then1 (print_number) missing: {code}");
+    assert!(
+        code.contains("print_bool"),
+        "Then0 (print_bool) missing: {code}"
+    );
+    assert!(
+        code.contains("print_number"),
+        "Then1 (print_number) missing: {code}"
+    );
 
     // No bare exec_output! in output.
-    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! in output: {code}"
+    );
 }
 
 /// Regression: a Sequence where Then0 has a LONG chain (5 nodes).
@@ -436,9 +456,15 @@ fn regression_long_chain_after_sequence_output_fully_emitted() {
 
     for i in 1..=5 {
         let name = format!("step_{}", ["one", "two", "three", "four", "five"][i - 1]);
-        assert!(code.contains(&name), "step {i} missing from long chain: {code}");
+        assert!(
+            code.contains(&name),
+            "step {i} missing from long chain: {code}"
+        );
     }
-    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! in output: {code}"
+    );
 }
 
 /// Regression: multi-statement chains on MULTIPLE outputs must all be present.
@@ -454,7 +480,13 @@ fn regression_multi_stmt_on_multiple_outputs() {
         .expect("inline failed");
 
     for sym in &["a1", "a2", "a3", "b1", "b2", "c1"] {
-        assert!(code.contains(sym), "{sym} missing from multi-output multi-stmt: {code}");
+        assert!(
+            code.contains(sym),
+            "{sym} missing from multi-output multi-stmt: {code}"
+        );
     }
-    assert!(!code.contains("exec_output"), "bare exec_output! in output: {code}");
+    assert!(
+        !code.contains("exec_output"),
+        "bare exec_output! in output: {code}"
+    );
 }

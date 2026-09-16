@@ -45,10 +45,10 @@ pub enum Severity {
 impl std::fmt::Display for Severity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Hint    => write!(f, "hint"),
-            Self::Info    => write!(f, "info"),
+            Self::Hint => write!(f, "hint"),
+            Self::Info => write!(f, "info"),
             Self::Warning => write!(f, "warning"),
-            Self::Error   => write!(f, "error"),
+            Self::Error => write!(f, "error"),
         }
     }
 }
@@ -78,12 +78,12 @@ pub enum PassName {
 impl std::fmt::Display for PassName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SubgraphExpander      => write!(f, "subgraph_expander"),
-            Self::TypeChecker           => write!(f, "type_checker"),
-            Self::DataFlowAnalysis      => write!(f, "data_flow_analysis"),
+            Self::SubgraphExpander => write!(f, "subgraph_expander"),
+            Self::TypeChecker => write!(f, "type_checker"),
+            Self::DataFlowAnalysis => write!(f, "data_flow_analysis"),
             Self::ExecutionFlowAnalysis => write!(f, "execution_flow_analysis"),
-            Self::CodeGeneration        => write!(f, "code_generation"),
-            Self::Custom(s)             => write!(f, "{}", s),
+            Self::CodeGeneration => write!(f, "code_generation"),
+            Self::Custom(s) => write!(f, "{}", s),
         }
     }
 }
@@ -109,11 +109,19 @@ pub struct SourceLocation {
 
 impl SourceLocation {
     pub fn node(node_id: impl Into<String>) -> Self {
-        Self { node_id: node_id.into(), pin_id: None, graph_id: None }
+        Self {
+            node_id: node_id.into(),
+            pin_id: None,
+            graph_id: None,
+        }
     }
 
     pub fn pin(node_id: impl Into<String>, pin_id: impl Into<String>) -> Self {
-        Self { node_id: node_id.into(), pin_id: Some(pin_id.into()), graph_id: None }
+        Self {
+            node_id: node_id.into(),
+            pin_id: Some(pin_id.into()),
+            graph_id: None,
+        }
     }
 
     pub fn with_graph(mut self, graph_id: impl Into<String>) -> Self {
@@ -126,7 +134,7 @@ impl std::fmt::Display for SourceLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.pin_id {
             Some(pin) => write!(f, "{}.{}", self.node_id, pin),
-            None      => write!(f, "{}", self.node_id),
+            None => write!(f, "{}", self.node_id),
         }
     }
 }
@@ -161,11 +169,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub fn new(
-        severity: Severity,
-        pass: PassName,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn new(severity: Severity, pass: PassName, message: impl Into<String>) -> Self {
         Self {
             severity,
             message: message.into(),
@@ -253,17 +257,19 @@ pub struct DiagnosticAccumulator {
 
 impl DiagnosticAccumulator {
     pub fn new(pass: PassName) -> Self {
-        Self { pass, diags: Vec::new() }
+        Self {
+            pass,
+            diags: Vec::new(),
+        }
     }
 
     fn push(&mut self, sev: Severity, node: &str, pin: Option<&str>, msg: impl Into<String>) {
         let loc = match pin {
             Some(p) => SourceLocation::pin(node, p),
-            None    => SourceLocation::node(node),
+            None => SourceLocation::node(node),
         };
-        self.diags.push(
-            Diagnostic::new(sev, self.pass.clone(), msg).at(loc)
-        );
+        self.diags
+            .push(Diagnostic::new(sev, self.pass.clone(), msg).at(loc));
     }
 
     pub fn error(&mut self, node: &str, pin: Option<&str>, msg: impl Into<String>) {
@@ -320,23 +326,35 @@ pub struct CompileResult<T> {
 impl<T> CompileResult<T> {
     /// Creates a successful result with no diagnostics.
     pub fn ok(value: T) -> Self {
-        Self { value: Some(value), diagnostics: Vec::new() }
+        Self {
+            value: Some(value),
+            diagnostics: Vec::new(),
+        }
     }
 
     /// Creates a successful result with accompanying diagnostics (warnings/hints).
     pub fn ok_with_diags(value: T, diags: Vec<Diagnostic>) -> Self {
-        Self { value: Some(value), diagnostics: diags }
+        Self {
+            value: Some(value),
+            diagnostics: diags,
+        }
     }
 
     /// Creates a failed result (no value) with at least one error diagnostic.
     pub fn err(diags: Vec<Diagnostic>) -> Self {
-        Self { value: None, diagnostics: diags }
+        Self {
+            value: None,
+            diagnostics: diags,
+        }
     }
 
     /// Creates a failed result from a single error message.
     pub fn err_msg(pass: PassName, msg: impl Into<String>) -> Self {
         let d = Diagnostic::new(Severity::Error, pass, msg);
-        Self { value: None, diagnostics: vec![d] }
+        Self {
+            value: None,
+            diagnostics: vec![d],
+        }
     }
 
     /// Returns `true` if the pass succeeded with no error diagnostics.
@@ -380,7 +398,8 @@ impl<T> CompileResult<T> {
 impl<T: std::fmt::Debug> CompileResult<T> {
     /// Formats all diagnostics as a multi-line string for logging/display.
     pub fn format_diagnostics(&self) -> String {
-        self.diagnostics.iter()
+        self.diagnostics
+            .iter()
             .map(|d| d.to_string())
             .collect::<Vec<_>>()
             .join("\n")

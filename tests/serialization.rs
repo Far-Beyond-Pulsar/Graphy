@@ -24,7 +24,11 @@ fn serde_datatype_data() {
 
 #[test]
 fn serde_datatype_data_with_metadata() {
-    let dt = DataType::Data(TypeInfo::new("Vec2").with_display_name("Vector 2D").with_layout(8, 4));
+    let dt = DataType::Data(
+        TypeInfo::new("Vec2")
+            .with_display_name("Vector 2D")
+            .with_layout(8, 4),
+    );
     let json = serde_json::to_string(&dt).unwrap();
     let deserialized: DataType = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, dt);

@@ -110,7 +110,13 @@ impl Connection {
         target_node: impl Into<String>,
         target_pin: impl Into<String>,
     ) -> Self {
-        Self::new(source_node, source_pin, target_node, target_pin, ConnectionType::Data)
+        Self::new(
+            source_node,
+            source_pin,
+            target_node,
+            target_pin,
+            ConnectionType::Data,
+        )
     }
 
     /// Creates an execution connection.
@@ -131,6 +137,12 @@ impl Connection {
         target_node: impl Into<String>,
         target_pin: impl Into<String>,
     ) -> Self {
-        Self::new(source_node, source_pin, target_node, target_pin, ConnectionType::Execution)
+        Self::new(
+            source_node,
+            source_pin,
+            target_node,
+            target_pin,
+            ConnectionType::Execution,
+        )
     }
 }

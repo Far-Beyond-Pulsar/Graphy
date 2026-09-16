@@ -63,65 +63,77 @@
 //! - Implement `CodeGenerator` for your target language
 //! - Add custom analysis passes with `AnalysisPass`
 
-pub mod core;
 pub mod analysis;
-pub mod generation;
-pub mod utils;
-pub mod parallel;
-pub mod logging;
+pub mod core;
 pub mod diagnostics;
+pub mod generation;
+pub mod logging;
+pub mod parallel;
 pub mod type_checker;
+pub mod utils;
 
 // Re-export commonly used types
 pub use core::{
-    GraphDescription, NodeInstance, Connection, Pin, PinInstance,
-    DataType, TypeInfo, NodeTypes, Position, ConnectionType, JsonValue,
-    GraphMetadata, NodeMetadata, ParamInfo, NodeMetadataProvider, PinType,
-    // v2 types
-    NodeKind, PropertyValue, PropertySchema, ReflectedType, PrimitiveKind,
-    ParamMeta,
-    // output metadata
-    OutputParam,
+    // document model
+    BlueprintDocument,
+    BlueprintMetadata,
+    ClassVariable,
+    Connection,
+    ConnectionType,
     // conversion metadata
     ConversionInfo,
-    // document model
-    BlueprintDocument, BlueprintMetadata, ClassVariable, DocumentEditorState,
-    Graph, GraphId, GraphInterface, GraphKind, GraphViewState, InterfacePin,
+    DataType,
+    DocumentEditorState,
+    Graph,
+    GraphDescription,
+    GraphId,
+    GraphInterface,
+    GraphKind,
+    GraphMetadata,
+    GraphViewState,
+    InterfacePin,
+    JsonValue,
+    NodeInstance,
+    // v2 types
+    NodeKind,
+    NodeMetadata,
+    NodeMetadataProvider,
+    NodeTypes,
+    // output metadata
+    OutputParam,
+    ParamInfo,
+    ParamMeta,
+    Pin,
+    PinInstance,
+    PinType,
+    Position,
+    PrimitiveKind,
+    PropertySchema,
+    PropertyValue,
+    ReflectedType,
+    TypeInfo,
     DOCUMENT_FORMAT_VERSION,
 };
 
-pub use analysis::{
-    DataResolver, ExecutionRouting, DataSource,
-};
+pub use analysis::{DataResolver, DataSource, ExecutionRouting};
 
-pub use generation::{
-    CodeGeneratorContext,
-};
+pub use generation::CodeGeneratorContext;
 
 pub use logging::{
-    compiler_debug,
-    compiler_error,
-    compiler_info,
-    compiler_trace,
-    compiler_warn,
-    subscribe_compiler_logs,
-    unsubscribe_compiler_logs,
-    CompilerLogLevel,
-    CompilerLogLine,
+    compiler_debug, compiler_error, compiler_info, compiler_trace, compiler_warn,
+    subscribe_compiler_logs, unsubscribe_compiler_logs, CompilerLogLevel, CompilerLogLine,
     CompilerLogSubscription,
 };
 
-pub use utils::{
-    SubGraphExpander,
-};
+pub use utils::SubGraphExpander;
 
 pub use diagnostics::{
     CompileResult, Diagnostic, DiagnosticAccumulator, PassName, Severity, SourceLocation,
 };
 
 pub use type_checker::{
-    Coercion, CoercionRegistry, TypeChecker, ConversionRegistry,
-    ConversionResolver, ConversionSuggestion,
+    Coercion, CoercionRegistry, ConversionRegistry, ConversionResolver, ConversionSuggestion,
+    TypeChecker,
 };
 
 /// Result type used throughout Graphy

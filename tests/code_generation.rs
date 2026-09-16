@@ -3,8 +3,8 @@
 mod common;
 
 use common::*;
-use graphy::*;
 use graphy::generation::collect_node_arguments;
+use graphy::*;
 
 // ===========================================================================
 // CodeGeneratorContext - Indentation
@@ -168,10 +168,7 @@ fn context_has_graph_access() {
 #[test]
 fn collect_args_with_properties() {
     let meta = NodeMetadata::new("add", NodeTypes::pure, "math")
-        .with_params(vec![
-            ParamInfo::new("a", "i64"),
-            ParamInfo::new("b", "i64"),
-        ]);
+        .with_params(vec![ParamInfo::new("a", "i64"), ParamInfo::new("b", "i64")]);
 
     let mut node = NodeInstance::new("add_1", "add", Position::zero());
     node.set_property("a", 5.0);
@@ -184,10 +181,7 @@ fn collect_args_with_properties() {
 #[test]
 fn collect_args_uses_defaults_for_missing_properties() {
     let meta = NodeMetadata::new("add", NodeTypes::pure, "math")
-        .with_params(vec![
-            ParamInfo::new("a", "i64"),
-            ParamInfo::new("b", "i64"),
-        ]);
+        .with_params(vec![ParamInfo::new("a", "i64"), ParamInfo::new("b", "i64")]);
 
     let node = NodeInstance::new("add_1", "add", Position::zero());
     // No properties set
@@ -202,10 +196,7 @@ fn collect_args_uses_defaults_for_missing_properties() {
 #[test]
 fn collect_args_mixed_properties_and_defaults() {
     let meta = NodeMetadata::new("add", NodeTypes::pure, "math")
-        .with_params(vec![
-            ParamInfo::new("a", "f64"),
-            ParamInfo::new("b", "f64"),
-        ]);
+        .with_params(vec![ParamInfo::new("a", "f64"), ParamInfo::new("b", "f64")]);
 
     let mut node = NodeInstance::new("add_1", "add", Position::zero());
     node.set_property("a", 7.5);
