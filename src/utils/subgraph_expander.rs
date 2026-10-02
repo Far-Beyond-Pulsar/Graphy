@@ -182,6 +182,17 @@ impl SubGraphExpander {
     ) -> Result<()> {
         let prefix = format!("{}__", call_id);
 
+        // Authored ids may contain the separator. Never overwrite a live node
+        // (and therefore alias its per-node state) when expanding a macro.
+        for node in sub.nodes.values() {
+            let expanded_id = format!("{prefix}{}", node.id);
+            if parent.nodes.contains_key(&expanded_id) {
+                return Err(GraphyError::GraphExpansion(format!(
+                    "Macro '{call_id}' would overwrite node '{expanded_id}'"
+                )));
+            }
+        }
+
         // Clone all non-entry/exit nodes from sub into parent, with prefix
         let mut entry_node_id: Option<String> = None;
         let mut exit_node_id: Option<String> = None;
