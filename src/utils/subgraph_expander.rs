@@ -2,8 +2,8 @@
 //!
 //! Inline expansion of macro and collapsed-region nodes.
 //!
-//! The expander takes a [`BlueprintDocument`] (or a single [`GraphDescription`]
-//! with a graph library) and rewrites every `SubgraphCall` node into its
+//! The expander takes a single [`GraphDescription`] with a graph library and
+//! rewrites every `SubgraphCall` node into its
 //! constituent nodes, wiring connections through the `SubgraphEntry` /
 //! `SubgraphExit` interface nodes. The result is a flat graph that can be
 //! passed to data-flow and execution-flow analysis without any further
@@ -36,8 +36,8 @@
 //! ## Flat-graph mode
 //!
 //! [`SubGraphExpander::expand_all_flat`] accepts a single `GraphDescription`
-//! plus a `HashMap<String, GraphDescription>` library, for callers that don't
-//! use [`BlueprintDocument`].
+//! plus a `HashMap<String, GraphDescription>` library, for callers that
+//! hold their graphs in a different container.
 
 use std::collections::HashMap;
 

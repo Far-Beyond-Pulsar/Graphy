@@ -64,6 +64,7 @@
 //! - Add custom analysis passes with `AnalysisPass`
 
 pub mod analysis;
+pub mod contracts;
 pub mod core;
 pub mod diagnostics;
 pub mod generation;
@@ -74,24 +75,13 @@ pub mod utils;
 
 // Re-export commonly used types
 pub use core::{
-    // document model
-    BlueprintDocument,
-    BlueprintMetadata,
-    ClassVariable,
     Connection,
     ConnectionType,
     // conversion metadata
     ConversionInfo,
     DataType,
-    DocumentEditorState,
-    Graph,
     GraphDescription,
-    GraphId,
-    GraphInterface,
-    GraphKind,
     GraphMetadata,
-    GraphViewState,
-    InterfacePin,
     JsonValue,
     NodeInstance,
     // v2 types
@@ -112,7 +102,11 @@ pub use core::{
     PropertyValue,
     ReflectedType,
     TypeInfo,
-    DOCUMENT_FORMAT_VERSION,
+};
+
+pub use contracts::{
+    check_connection_types, check_invariants, ChainResolver, ChangeSet, Compatibility, EditError,
+    GraphChange, GraphCommand, IdAllocator, NodeId, PinRef, StructuralResolver, TypeResolver,
 };
 
 pub use analysis::{DataResolver, DataSource, ExecutionRouting};
