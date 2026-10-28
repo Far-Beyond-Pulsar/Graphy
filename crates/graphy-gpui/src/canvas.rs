@@ -193,6 +193,51 @@ impl GraphCanvas {
         &mut self.controller
     }
 
+    /// Pan (graph units) and zoom of the view; `screen = (graph + pan) * zoom`.
+    pub fn view(&self) -> (Vec2, f32) {
+        (self.controller.view.pan, self.controller.view.zoom)
+    }
+
+    /// Restores a saved view.
+    pub fn set_view(&mut self, pan: Vec2, zoom: f32, cx: &mut Context<Self>) {
+        self.controller.view.pan = pan;
+        self.controller.view.zoom = zoom.clamp(graphy_render::MIN_ZOOM, graphy_render::MAX_ZOOM);
+        cx.emit(CanvasEvent::ViewChanged);
+        cx.notify();
+    }
+
+    /// Centres the view on a node. Returns whether the node exists.
+    pub fn center_on(&mut self, node: &str, cx: &mut Context<Self>) -> bool {
+        let Some(n) = self.scene.node(node) else {
+            return false;
+        };
+        let center = n.rect().center();
+        let zoom = self.controller.view.zoom;
+        self.controller.view.pan = Vec2::new(
+            self.controller.viewport.x * 0.5 / zoom - center.x,
+            self.controller.viewport.y * 0.5 / zoom - center.y,
+        );
+        cx.emit(CanvasEvent::ViewChanged);
+        cx.notify();
+        true
+    }
+
+    /// Replaces the selection with these nodes.
+    pub fn select_nodes<I: IntoIterator<Item = String>>(&mut self, ids: I, cx: &mut Context<Self>) {
+        self.controller.selection.clear();
+        self.controller.selection.nodes.extend(ids);
+        cx.emit(CanvasEvent::SelectionChanged);
+        cx.notify();
+    }
+
+    /// Re-presents every node. Call after the profile's own data changed
+    /// (subgraph names, the running-node set).
+    pub fn refresh_scene(&mut self, cx: &mut Context<Self>) {
+        self.scene
+            .rebuild(&self.graph, self.profile.presenter(), &self.measure);
+        cx.notify();
+    }
+
     /// Replaces the document (load, revert). Selection is cleared.
     pub fn set_graph(&mut self, graph: GraphDescription, cx: &mut Context<Self>) {
         self.graph = graph;

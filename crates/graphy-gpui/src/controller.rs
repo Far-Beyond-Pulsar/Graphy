@@ -97,6 +97,8 @@ pub enum Action {
     OpenGraph(MacroTarget),
     /// Double-click on any other node.
     NodeActivated(String),
+    /// Double-click on a comment's header (rename it).
+    CommentActivated(usize),
     /// A host row (preview, inline widget) was pressed; `local` is relative to
     /// the row rectangle in graph units.
     SlotPressed {
@@ -593,6 +595,10 @@ impl Controller {
                 }
                 self.selection.comments.insert(i);
                 out.actions.push(Action::SelectionChanged);
+                if clicks >= 2 {
+                    out.actions.push(Action::CommentActivated(i));
+                    return;
+                }
                 let carried = cx
                     .scene
                     .nodes
@@ -1352,6 +1358,15 @@ impl Controller {
                 .nodes
                 .iter()
                 .map(|id| GraphCommand::RemoveNode { id: id.clone() }),
+        );
+        // highest index first so earlier removals do not shift later ones
+        cmds.extend(
+            self.selection
+                .comments
+                .iter()
+                .rev()
+                .filter(|i| cx.scene.comments.get(**i).is_some_and(|c| c.editable))
+                .map(|&index| GraphCommand::RemoveComment { index }),
         );
         cmds
     }
