@@ -344,3 +344,63 @@ fn comment_add_edit_remove_undo_restores_exact_document() {
     assert_eq!(graph.comments[0].color, before[0].color);
     assert!(graph.comments[0].contained_node_ids.is_empty());
 }
+
+#[test]
+fn diff_commands_turn_one_graph_into_the_other_and_undo_back() {
+    use graphy::core::GraphComment;
+    use graphy::{diff_commands, Connection, DataType, GraphCommand, NodeInstance, Position};
+
+    let node = |id: &str, ty: &str, x: f64| {
+        let mut n = NodeInstance::new(id, ty, Position::new(x, 0.0));
+        n.add_input_pin("i", DataType::Exec);
+        n.add_output_pin("o", DataType::Exec);
+        n
+    };
+    let mut before = GraphDescription::new("g");
+    for n in [node("a", "t", 0.0), node("b", "t", 10.0), node("c", "t", 20.0)] {
+        before.add_node(n);
+    }
+    before.add_connection(Connection::execution("a", "o", "b", "i"));
+    before.add_connection(Connection::execution("b", "o", "c", "i"));
+
+    let mut after = before.clone();
+    after.nodes.get_mut("a").unwrap().position = Position::new(5.0, 5.0);
+    after.nodes.remove("c");
+    after.connections.retain(|c| c.target_node != "c");
+    after.add_node(node("d", "u", 30.0));
+    after.add_connection(Connection::execution("b", "o", "d", "i"));
+    after.comments.push(GraphComment::new("hi", Position::zero(), (5.0, 5.0)));
+    // "b" changes type, so it is rebuilt and its edges must be restored.
+    after.nodes.get_mut("b").unwrap().node_type = "other".into();
+
+    let cmds = diff_commands(&before, &after);
+    let mut graph = before.clone();
+    let mut applied = Vec::new();
+    for c in &cmds {
+        applied.push(c.apply(&mut graph).expect("diff command applies"));
+    }
+    let edges = |g: &GraphDescription| {
+        let mut e: Vec<_> = g
+            .connections
+            .iter()
+            .map(|c| format!("{}.{}->{}.{}", c.source_node, c.source_pin, c.target_node, c.target_pin))
+            .collect();
+        e.sort();
+        e
+    };
+    let mut ids: Vec<_> = graph.nodes.keys().cloned().collect();
+    ids.sort();
+    assert_eq!(ids, ["a", "b", "d"]);
+    assert_eq!(graph.nodes["b"].node_type, "other");
+    assert_eq!(graph.nodes["a"].position.x, 5.0);
+    assert_eq!(edges(&graph), edges(&after));
+    assert_eq!(graph.comments.len(), 1);
+
+    for cs in applied.iter().rev() {
+        cs.undo(&mut graph);
+    }
+    assert_eq!(edges(&graph), edges(&before));
+    assert_eq!(graph.nodes.len(), 3);
+    assert!(graph.comments.is_empty());
+    let _ = GraphCommand::RemoveNode { id: String::new() };
+}

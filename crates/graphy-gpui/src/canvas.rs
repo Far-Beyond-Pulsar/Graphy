@@ -57,6 +57,8 @@ pub enum CanvasEvent {
     /// document dirty, re-validate. `label` names the user-visible edit.
     Edited {
         label: &'static str,
+        /// What was asked for, to replay on redo.
+        commands: Vec<GraphCommand>,
         changes: ChangeSet,
     },
     /// A command batch failed and was rolled back.
@@ -263,7 +265,11 @@ impl GraphCanvas {
                     self.profile.presenter(),
                     &self.measure,
                 );
-                cx.emit(CanvasEvent::Edited { label, changes });
+                cx.emit(CanvasEvent::Edited {
+                    label,
+                    commands: commands.to_vec(),
+                    changes,
+                });
                 cx.notify();
                 Ok(())
             }

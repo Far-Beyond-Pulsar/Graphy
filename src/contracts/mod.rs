@@ -24,11 +24,13 @@
 //!   `graphy-render*` crates, which are created when they contain code.
 
 pub mod commands;
+pub mod diff;
 pub mod ids;
 pub mod invariants;
 pub mod resolver;
 
 pub use commands::{can_connect_replacing, ChangeSet, EditError, GraphChange, GraphCommand};
+pub use diff::diff_commands;
 pub use ids::{IdAllocator, NodeId, PinRef};
 pub use invariants::check_invariants;
 pub use resolver::{
