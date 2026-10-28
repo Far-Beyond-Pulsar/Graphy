@@ -141,6 +141,12 @@ pub trait GraphProfile {
         None
     }
 
+    /// Whether `node` may be deleted (structural nodes such as a macro's
+    /// entry and exit may not).
+    fn is_deletable(&self, _node: &NodeInstance) -> bool {
+        true
+    }
+
     /// Whether activating `node` opens another graph (macro navigation).
     fn macro_target(&self, _node: &NodeInstance) -> Option<MacroTarget> {
         None

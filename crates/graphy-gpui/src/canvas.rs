@@ -195,6 +195,27 @@ impl GraphCanvas {
         &mut self.controller
     }
 
+    /// Window position -> graph position (valid after the first frame).
+    pub fn window_to_graph(&self, p: Point<Pixels>) -> Vec2 {
+        self.controller.view.screen_to_graph(to_vec(p, self.origin))
+    }
+
+    /// Graph position -> window position.
+    pub fn graph_to_window(&self, g: Vec2) -> Point<Pixels> {
+        let s = self.controller.view.graph_to_screen(g);
+        Point::new(px(s.x + f32::from(self.origin.x)), px(s.y + f32::from(self.origin.y)))
+    }
+
+    /// Canvas-relative pixels (as reported by menu requests) -> window position.
+    pub fn local_to_window(&self, p: Vec2) -> Point<Pixels> {
+        Point::new(px(p.x + f32::from(self.origin.x)), px(p.y + f32::from(self.origin.y)))
+    }
+
+    /// Size of the canvas in logical pixels, as of the last frame.
+    pub fn viewport(&self) -> Vec2 {
+        self.controller.viewport
+    }
+
     /// Pan (graph units) and zoom of the view; `screen = (graph + pan) * zoom`.
     pub fn view(&self) -> (Vec2, f32) {
         (self.controller.view.pan, self.controller.view.zoom)

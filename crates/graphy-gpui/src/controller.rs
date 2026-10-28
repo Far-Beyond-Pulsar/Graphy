@@ -1357,6 +1357,12 @@ impl Controller {
             self.selection
                 .nodes
                 .iter()
+                .filter(|id| {
+                    cx.graph
+                        .nodes
+                        .get(*id)
+                        .map_or(true, |n| cx.profile.is_deletable(n))
+                })
                 .map(|id| GraphCommand::RemoveNode { id: id.clone() }),
         );
         // highest index first so earlier removals do not shift later ones
