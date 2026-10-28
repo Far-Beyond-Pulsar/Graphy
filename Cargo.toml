@@ -1,7 +1,7 @@
 # Graphy workspace
 #
-# Dependency DAG (arrows point at dependencies; every crate is headless, none may
-# depend on gpui or wgpu):
+# Dependency DAG (arrows point at dependencies). The first four crates are
+# headless: none may depend on gpui or wgpu.
 #
 #   graphy            document/compiler IR, stable ids, graph invariants, type
 #                     resolution, diagnostics, edit commands, analysis and codegen
@@ -11,11 +11,27 @@
 #                     TypeResolver and NodeMetadata  ->  graphy, pulsar_reflection;
 #                     the only crate that knows Pulsar, so graphy stays free of it
 #
-# Render/UI crates (graphy-render, graphy-render-wgpu, graphy-gpui) are added only
-# once they contain code. They sit above `graphy`; compiler-only consumers
-# (psgc, blueprint_compiler, pulsar_game) never pull them in.
+#   graphy-render     headless canvas model: the one layout model (rows with per-row
+#                     heights), view transform, R-tree spatial index, hit testing,
+#                     scene derived from GraphDescription, renderer-neutral draw data
+#                     (culling, zoom-tier LOD, state hierarchy), presenter hooks
+#                     ->  graphy
+#   graphy-render-wgpu shared GPU drawing of `DrawData` into the HOST's device/queue
+#                     and render pass (never creates a device); glyph atlas text
+#                     ->  graphy-render, wgpu
+#   graphy-gpui       interaction engine (selection, marquee, move/resize, snapping,
+#                     connect/disconnect/reroute, clipboard, framing), the GraphProfile
+#                     extension API and, behind feature `gpui`, the GPUI canvas
+#                     ->  graphy, graphy-render (and graphy-render-wgpu, gpui)
+#                     NOT a member of this workspace: the gpui feature needs Pulsar's
+#                     wgpu/gpui forks, so it is its own workspace (crates/graphy-gpui)
+#                     and Graphy's lockfile never resolves them.
+#
+# Compiler-only consumers (psgc, blueprint_compiler, pulsar_game) never pull the
+# render or UI crates in.
 [workspace]
 members = [".", "crates/graphy-blueprint", "crates/graphy-reflection", "crates/graphy-render", "crates/graphy-render-wgpu"]
+exclude = ["crates/graphy-gpui"]
 resolver = "2"
 
 [package]

@@ -48,6 +48,25 @@ impl Presenter for SamplePresenter {
         }
         p
     }
+
+    fn pin_widget(
+        &self,
+        _node: &NodeInstance,
+        pin: &graphy::PinInstance,
+        _side: crate::layout::PinSide,
+    ) -> Option<crate::presenter::PinWidget> {
+        match pin.data_type() {
+            DataType::Data(t) if t.type_string == "f32" => Some(crate::presenter::PinWidget {
+                text: "0.0".into(),
+                width: 30.0,
+            }),
+            DataType::Data(t) if t.type_string == "String" => Some(crate::presenter::PinWidget {
+                text: "Hello".into(),
+                width: 46.0,
+            }),
+            _ => None,
+        }
+    }
 }
 
 fn node(

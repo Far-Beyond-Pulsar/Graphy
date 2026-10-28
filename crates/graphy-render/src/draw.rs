@@ -806,3 +806,28 @@ impl Scene {
 fn text_fits(size: f32, p: &DrawParams) -> bool {
     size * p.view.zoom >= p.min_text_px
 }
+
+impl Scene {
+    /// Host-owned rows (previews, inline widgets) of the nodes intersecting
+    /// `visible`, in graph space. GPUI hosts use it to place child elements over
+    /// the canvas; it is the same rectangle `build_draw_data` reports.
+    pub fn slot_rects(&self, visible: Rect) -> Vec<PreviewSlot> {
+        let mut out = Vec::new();
+        for ni in self.spatial.nodes.query(visible, false) {
+            let node = &self.nodes[ni];
+            for row in &node.layout.rows {
+                if let RowContent::Custom { slot } = row.content {
+                    out.push(PreviewSlot {
+                        node: node.id.clone(),
+                        slot,
+                        rect: row
+                            .rect
+                            .translate(node.pos)
+                            .expand(-self.metrics.pin_inset * 0.5),
+                    });
+                }
+            }
+        }
+        out
+    }
+}

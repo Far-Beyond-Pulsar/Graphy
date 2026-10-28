@@ -97,6 +97,16 @@ pub struct PinWidget {
     pub width: f32,
 }
 
+/// A titled region supplied by the profile rather than stored as a document
+/// comment (render-graph sections, buffer groups). Drawn like a comment; the
+/// shared interactions never edit it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SectionSpec {
+    pub title: String,
+    pub rect: crate::geom::Rect,
+    pub accent: Color,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CommentPresentation {
     pub accent: Color,
@@ -142,6 +152,11 @@ pub trait Presenter {
             routing: WireRouting::Bezier,
             exec: conn.connection_type == ConnectionType::Execution,
         }
+    }
+
+    /// Profile-defined sections drawn behind the nodes.
+    fn sections(&self, _graph: &graphy::GraphDescription) -> Vec<SectionSpec> {
+        Vec::new()
     }
 
     fn comment(&self, _index: usize, _comment: &GraphComment) -> CommentPresentation {

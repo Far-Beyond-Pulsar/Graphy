@@ -72,6 +72,8 @@ pub struct SceneComment {
     pub text: String,
     pub rect: Rect,
     pub presentation: CommentPresentation,
+    /// `false` for profile-supplied sections, which are not document comments.
+    pub editable: bool,
 }
 
 /// A resolved connection.
@@ -156,8 +158,19 @@ impl Scene {
                     Vec2::new(c.size.0 as f32, c.size.1 as f32),
                 ),
                 presentation: presenter.comment(i, c),
+                editable: true,
             })
             .collect();
+        let doc_comments = self.comments.len();
+        for s in presenter.sections(graph) {
+            self.comments.push(SceneComment {
+                text: s.title,
+                rect: s.rect,
+                presentation: CommentPresentation { accent: s.accent },
+                editable: false,
+            });
+        }
+        debug_assert!(self.comments[..doc_comments].iter().all(|c| c.editable));
         self.rebuild_wires(graph, presenter);
         self.spatial
             .nodes

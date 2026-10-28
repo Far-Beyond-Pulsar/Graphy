@@ -153,7 +153,12 @@ impl GraphRenderer {
         format: wgpu::TextureFormat,
         fonts: FontSet,
     ) -> Result<Self, &'static str> {
-        let fonts = Fonts::load(&fonts)?;
+        Ok(Self::with_fonts(device, format, Fonts::load(&fonts)?))
+    }
+
+    /// Like [`GraphRenderer::new`] with fonts already loaded (so a host can
+    /// measure text for layout before it has a GPU device).
+    pub fn with_fonts(device: &wgpu::Device, format: wgpu::TextureFormat, fonts: Fonts) -> Self {
         let text = TextEngine::new(device, fonts);
 
         let uni_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -306,7 +311,7 @@ impl GraphRenderer {
         );
 
         let vb = wgpu::BufferUsages::VERTEX;
-        Ok(Self {
+        Self {
             uniform_buf,
             uniform_bg,
             grid,
@@ -325,7 +330,7 @@ impl GraphRenderer {
             box_scratch: Vec::new(),
             wire_scratch: Vec::new(),
             text_scratch: Vec::new(),
-        })
+        }
     }
 
     /// Text measurer backed by the same fonts the renderer draws with. Build

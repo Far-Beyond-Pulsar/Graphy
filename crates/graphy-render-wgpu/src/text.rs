@@ -42,6 +42,13 @@ impl Fonts {
         Ok(Fonts { regular, bold })
     }
 
+    /// Zoom-independent measurer for building a `Scene` before any GPU exists.
+    pub fn measure(&self) -> FontMeasure {
+        FontMeasure {
+            fonts: self.clone(),
+        }
+    }
+
     fn pick(&self, bold: bool) -> &fontdue::Font {
         if bold {
             &self.bold
