@@ -173,6 +173,7 @@ fn create_linear_chain(length: usize) -> GraphDescription {
         let source_pin = if i == 0 { "value" } else { "result" };
 
         graph.add_connection(Connection {
+            id: None,
             source_node: source.to_string(),
             source_pin: source_pin.to_string(),
             target_node: node_id.clone(),
@@ -231,6 +232,7 @@ fn create_wide_graph(width: usize) -> GraphDescription {
 
         // Connect constants
         graph.add_connection(Connection {
+            id: None,
             source_node: format!("const_{}", i),
             source_pin: "value".to_string(),
             target_node: node_id.clone(),
@@ -239,6 +241,7 @@ fn create_wide_graph(width: usize) -> GraphDescription {
         });
 
         graph.add_connection(Connection {
+            id: None,
             source_node: format!("const_{}", i + 1),
             source_pin: "value".to_string(),
             target_node: node_id.clone(),
@@ -270,6 +273,7 @@ fn create_wide_graph(width: usize) -> GraphDescription {
     // Connect first and last operation to final
     if width >= 2 {
         graph.add_connection(Connection {
+            id: None,
             source_node: "op_0".to_string(),
             source_pin: "result".to_string(),
             target_node: "final_add".to_string(),
@@ -278,6 +282,7 @@ fn create_wide_graph(width: usize) -> GraphDescription {
         });
 
         graph.add_connection(Connection {
+            id: None,
             source_node: format!("op_{}", width - 2),
             source_pin: "result".to_string(),
             target_node: "final_add".to_string(),
@@ -360,6 +365,7 @@ fn create_dependency_tree(depth: usize) -> GraphDescription {
 
             // Connect children
             graph.add_connection(Connection {
+                id: None,
                 source_node: left_child,
                 source_pin: if current_depth == 1 {
                     "value"
@@ -373,6 +379,7 @@ fn create_dependency_tree(depth: usize) -> GraphDescription {
             });
 
             graph.add_connection(Connection {
+                id: None,
                 source_node: right_child,
                 source_pin: if current_depth == 1 {
                     "value"
@@ -457,6 +464,7 @@ fn create_control_flow_graph(num_branches: usize) -> GraphDescription {
         let source_pin = if i == 0 { "exec" } else { "then" };
 
         graph.add_connection(Connection {
+            id: None,
             source_node: source_node.to_string(),
             source_pin: source_pin.to_string(),
             target_node: branch_id.clone(),
@@ -512,6 +520,7 @@ fn create_control_flow_graph(num_branches: usize) -> GraphDescription {
 
         // Connect branches to prints
         graph.add_connection(Connection {
+            id: None,
             source_node: branch_id.clone(),
             source_pin: "true".to_string(),
             target_node: print_true_id,
@@ -520,6 +529,7 @@ fn create_control_flow_graph(num_branches: usize) -> GraphDescription {
         });
 
         graph.add_connection(Connection {
+            id: None,
             source_node: branch_id,
             source_pin: "false".to_string(),
             target_node: print_false_id,
@@ -568,6 +578,7 @@ fn create_monster_graph(scale: usize) -> GraphDescription {
             // Connect to left neighbor
             if col > 0 {
                 graph.add_connection(Connection {
+                    id: None,
                     source_node: format!("grid_{}_{}", row, col - 1),
                     source_pin: "result".to_string(),
                     target_node: node_id.clone(),
@@ -579,6 +590,7 @@ fn create_monster_graph(scale: usize) -> GraphDescription {
             // Connect to top neighbor
             if row > 0 {
                 graph.add_connection(Connection {
+                    id: None,
                     source_node: format!("grid_{}_{}", row - 1, col),
                     source_pin: "result".to_string(),
                     target_node: node_id.clone(),

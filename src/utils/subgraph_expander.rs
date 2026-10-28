@@ -214,6 +214,7 @@ impl SubGraphExpander {
         // Clone all connections from sub, with prefixed node/pin IDs
         for conn in &sub.connections {
             parent.connections.push(Connection {
+                id: None,
                 source_node: format!("{}{}", prefix, conn.source_node),
                 source_pin: conn.source_pin.clone(),
                 target_node: format!("{}{}", prefix, conn.target_node),
@@ -231,6 +232,7 @@ impl SubGraphExpander {
                 // Incoming to call site → rewire to entry node
                 if let Some(entry_id) = &entry_node_id {
                     to_add.push(Connection {
+                        id: None,
                         source_node: conn.source_node.clone(),
                         source_pin: conn.source_pin.clone(),
                         target_node: entry_id.clone(),
@@ -243,6 +245,7 @@ impl SubGraphExpander {
                 // Outgoing from call site → rewire from exit node
                 if let Some(exit_id) = &exit_node_id {
                     to_add.push(Connection {
+                        id: None,
                         source_node: exit_id.clone(),
                         source_pin: conn.source_pin.clone(),
                         target_node: conn.target_node.clone(),

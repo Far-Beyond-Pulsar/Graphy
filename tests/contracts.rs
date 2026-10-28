@@ -304,3 +304,43 @@ fn scoped_resolver_confines_a_domain_and_blocks_cross_domain_connections() {
     assert_eq!(r.compatibility(&t("f32"), &t("f64")), Compatibility::Unknown);
     assert_eq!(r.compatibility(&DataType::Exec, &DataType::Exec), Compatibility::Unknown);
 }
+
+#[test]
+fn comment_add_edit_remove_undo_restores_exact_document() {
+    use graphy::core::GraphComment;
+    use graphy::{GraphCommand, Position};
+
+    let mut graph = GraphDescription::new("t");
+    let mut first = GraphComment::new("one", Position::new(1.0, 2.0), (10.0, 20.0));
+    first.id = "c1".into();
+    graph.comments.push(first);
+    let before = graph.comments.clone();
+
+    let mut second = GraphComment::new("two", Position::new(5.0, 6.0), (30.0, 40.0));
+    second.id = "c2".into();
+    let mut applied = Vec::new();
+    for cmd in [
+        GraphCommand::AddComment { index: 0, comment: second },
+        GraphCommand::EditComment {
+            index: 1,
+            text: Some("renamed".into()),
+            color: Some([1.0, 0.0, 0.0, 1.0]),
+            contained_node_ids: Some(vec!["n".into()]),
+        },
+        GraphCommand::RemoveComment { index: 0 },
+    ] {
+        applied.push(cmd.apply(&mut graph).expect("edit applies"));
+    }
+    assert_eq!(graph.comments.len(), 1);
+    assert_eq!(graph.comments[0].text, "renamed");
+    assert_eq!(graph.comments[0].id, "c1");
+
+    for changes in applied.iter().rev() {
+        changes.undo(&mut graph);
+    }
+    assert_eq!(graph.comments.len(), before.len());
+    assert_eq!(graph.comments[0].id, "c1");
+    assert_eq!(graph.comments[0].text, "one");
+    assert_eq!(graph.comments[0].color, before[0].color);
+    assert!(graph.comments[0].contained_node_ids.is_empty());
+}

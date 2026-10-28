@@ -238,6 +238,9 @@ pub fn clean_scene() -> GraphDescription {
     data(&mut g, "tex", "Color", "mix", "A");
     data(&mut g, "tex", "Alpha", "mix", "Alpha");
     g.comments.push(GraphComment {
+        id: String::new(),
+        color: GraphComment::default_color(),
+        contained_node_ids: Vec::new(),
         text: "Branch on speed".into(),
         position: Position::new(-250.0, -50.0),
         size: (740.0, 440.0),
@@ -361,6 +364,9 @@ pub fn crowded_scene(cols: usize, rows: usize) -> GraphDescription {
     }
     for k in 0..(cols / 3).max(1) {
         g.comments.push(GraphComment {
+            id: String::new(),
+            color: GraphComment::default_color(),
+            contained_node_ids: Vec::new(),
             text: format!("Section {}", k + 1),
             position: Position::new(k as f64 * 870.0 - 20.0, -50.0),
             size: (850.0, rows as f64 * 230.0 + 80.0),

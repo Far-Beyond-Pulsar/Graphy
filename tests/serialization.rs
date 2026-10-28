@@ -219,6 +219,9 @@ fn serde_full_graph_round_trip() {
 
     // Add comments
     graph.comments.push(core::GraphComment {
+        id: String::new(),
+        color: graphy::core::GraphComment::default_color(),
+        contained_node_ids: Vec::new(),
         text: "Math section".into(),
         position: Position::zero(),
         size: (200.0, 100.0),

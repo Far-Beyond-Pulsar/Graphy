@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::GraphComment;
 use crate::{Connection, ConnectionType, GraphDescription, JsonValue, NodeInstance, PinInstance, Position};
 
 /// A requested edit.
@@ -22,6 +23,16 @@ pub enum GraphCommand {
     MoveComment { index: usize, x: f64, y: f64 },
     /// Resizes the comment at `index`.
     ResizeComment { index: usize, width: f64, height: f64 },
+    /// Inserts a comment at `index` (appends when `index` is past the end).
+    AddComment { index: usize, comment: GraphComment },
+    RemoveComment { index: usize },
+    /// Replaces the comment at `index` text/colour/containment in one edit.
+    EditComment {
+        index: usize,
+        text: Option<String>,
+        color: Option<[f32; 4]>,
+        contained_node_ids: Option<Vec<String>>,
+    },
     Connect(Connection),
     Disconnect(Connection),
     /// Sets (`Some`) or clears (`None`) a legacy constant property.
@@ -69,6 +80,9 @@ pub enum GraphChange {
         from: (f64, f64),
         to: (f64, f64),
     },
+    CommentAdded { index: usize, comment: GraphComment },
+    CommentRemoved { index: usize, comment: GraphComment },
+    CommentEdited { index: usize, old: GraphComment, new: GraphComment },
     ConnectionAdded(Connection),
     ConnectionRemoved(IndexedConnection),
     PropertySet {
@@ -203,6 +217,35 @@ impl GraphCommand {
                 let from = c.size;
                 c.size = (*width, *height);
                 GraphChange::CommentResized { index: *index, from, to: (*width, *height) }
+            }
+            GraphCommand::AddComment { index, comment } => {
+                let at = (*index).min(graph.comments.len());
+                graph.comments.insert(at, comment.clone());
+                GraphChange::CommentAdded { index: at, comment: comment.clone() }
+            }
+            GraphCommand::RemoveComment { index } => {
+                if *index >= graph.comments.len() {
+                    return Err(EditError::NoSuchComment(*index));
+                }
+                let comment = graph.comments.remove(*index);
+                GraphChange::CommentRemoved { index: *index, comment }
+            }
+            GraphCommand::EditComment { index, text, color, contained_node_ids } => {
+                let c = graph
+                    .comments
+                    .get_mut(*index)
+                    .ok_or(EditError::NoSuchComment(*index))?;
+                let old = c.clone();
+                if let Some(t) = text {
+                    c.text = t.clone();
+                }
+                if let Some(col) = color {
+                    c.color = *col;
+                }
+                if let Some(ids) = contained_node_ids {
+                    c.contained_node_ids = ids.clone();
+                }
+                GraphChange::CommentEdited { index: *index, old, new: c.clone() }
             }
             GraphCommand::Connect(c) => {
                 check_connect(graph, c)?;
@@ -375,6 +418,19 @@ impl ChangeSet {
                         c.size = *from;
                     }
                 }
+                GraphChange::CommentAdded { index, .. } => {
+                    if *index < graph.comments.len() {
+                        graph.comments.remove(*index);
+                    }
+                }
+                GraphChange::CommentRemoved { index, comment } => {
+                    graph.comments.insert((*index).min(graph.comments.len()), comment.clone());
+                }
+                GraphChange::CommentEdited { index, old, .. } => {
+                    if let Some(c) = graph.comments.get_mut(*index) {
+                        *c = old.clone();
+                    }
+                }
                 GraphChange::ConnectionAdded(c) => {
                     if let Some(i) = graph.connections.iter().position(|e| same_edge(e, c)) {
                         graph.connections.remove(i);
@@ -432,7 +488,10 @@ impl ChangeSet {
                     }
                 }
                 GraphChange::NodeMoved { id, .. } => add(id),
-                GraphChange::CommentMoved { .. } | GraphChange::CommentResized { .. } => {}
+                GraphChange::CommentMoved { .. } | GraphChange::CommentResized { .. }
+                | GraphChange::CommentAdded { .. }
+                | GraphChange::CommentRemoved { .. }
+                | GraphChange::CommentEdited { .. } => {}
                 GraphChange::ConnectionAdded(c) => {
                     add(&c.source_node);
                     add(&c.target_node);
