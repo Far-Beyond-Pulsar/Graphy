@@ -139,6 +139,8 @@ pub struct PreviewSlot {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CanvasDraw {
     pub background: Color,
+    /// Card body colour; pins use it for their open core.
+    pub card_body: Color,
     pub grid_minor: Color,
     pub grid_major: Color,
     /// Graph units between minor lines at zoom-independent base spacing.
@@ -220,12 +222,24 @@ pub struct DrawParams {
 
 impl DrawParams {
     pub fn new(viewport: Vec2, view: ViewTransform) -> Self {
-        Self { viewport, view, time: 0.0, theme: Theme::dark(), weights: WireWeights::default(), min_text_px: 5.5 }
+        Self {
+            viewport,
+            view,
+            time: 0.0,
+            theme: Theme::dark(),
+            weights: WireWeights::default(),
+            min_text_px: 5.5,
+        }
     }
 }
 
 impl Scene {
-    pub fn build_draw_data(&self, p: &DrawParams, st: &InteractionState, measure: &dyn TextMeasure) -> DrawData {
+    pub fn build_draw_data(
+        &self,
+        p: &DrawParams,
+        st: &InteractionState,
+        measure: &dyn TextMeasure,
+    ) -> DrawData {
         let lod = LodTier::for_zoom(p.view.zoom);
         let theme = &p.theme;
         let visible = p.view.visible_rect(p.viewport, 48.0);
@@ -236,6 +250,7 @@ impl Scene {
             time: p.time,
             canvas: CanvasDraw {
                 background: theme.canvas,
+                card_body: theme.card_body,
                 grid_minor: theme.grid_minor,
                 grid_major: theme.grid_major,
                 minor_step: 20.0,
@@ -282,7 +297,10 @@ impl Scene {
                 let max_w = c.rect.width() - 24.0;
                 out.texts.push(TextDraw {
                     text: fit_text(measure, &c.text, self.metrics.title_font, max_w),
-                    pos: Vec2::new(c.rect.min.x + 12.0, c.rect.min.y + self.metrics.comment_header_h * 0.5),
+                    pos: Vec2::new(
+                        c.rect.min.x + 12.0,
+                        c.rect.min.y + self.metrics.comment_header_h * 0.5,
+                    ),
                     size: self.metrics.title_font,
                     color: theme.text_dim,
                     align: TextAlign::Left,
@@ -311,7 +329,8 @@ impl Scene {
         let (mut dim, mut normal, mut emph) = (Vec::new(), Vec::new(), Vec::new());
         for wi in candidates {
             let w = &self.wires[wi];
-            let touches_focus = focus_nodes.contains(&w.from_node) || focus_nodes.contains(&w.to_node);
+            let touches_focus =
+                focus_nodes.contains(&w.from_node) || focus_nodes.contains(&w.to_node);
             let picked = hovered_wire == Some(wi) || st.selected_wires.contains(&w.connection);
             let src = &self.nodes[w.from_node];
             let active = src.presentation.active;
@@ -333,7 +352,11 @@ impl Scene {
             let draw = WireDraw {
                 shape: w.shape,
                 color,
-                width: if lod == LodTier::Overview { width * 1.4 } else { width },
+                width: if lod == LodTier::Overview {
+                    width * 1.4
+                } else {
+                    width
+                },
                 flags: f,
                 phase: ((wi as u32).wrapping_mul(2654435761) >> 8) as f32 / (1u32 << 24) as f32,
                 segments: lod.wire_segments(),
@@ -393,9 +416,17 @@ impl Scene {
                 if let Some(a) = anchor.pin_pos(c.anchor.side, c.anchor.pin) {
                     let end = c
                         .snapped
-                        .and_then(|s| self.nodes.get(s.node).and_then(|n| n.pin_pos(s.side, s.pin)))
+                        .and_then(|s| {
+                            self.nodes
+                                .get(s.node)
+                                .and_then(|n| n.pin_pos(s.side, s.pin))
+                        })
                         .unwrap_or(c.cursor);
-                    let (from, to) = if c.anchor.side == PinSide::Output { (a, end) } else { (end, a) };
+                    let (from, to) = if c.anchor.side == PinSide::Output {
+                        (a, end)
+                    } else {
+                        (end, a)
+                    };
                     let color = anchor.pins(c.anchor.side)[c.anchor.pin].style.color;
                     out.overlay_wires.push(WireDraw {
                         shape: WireShape::new(c.routing, from, to),
@@ -466,7 +497,11 @@ impl Scene {
             NodeShape::Reroute => BoxKind::Reroute,
             NodeShape::Pill => BoxKind::Pill,
         };
-        let border = if hovered { theme.card_border_hover } else { theme.card_border };
+        let border = if hovered {
+            theme.card_border_hover
+        } else {
+            theme.card_border
+        };
         out.nodes.push(BoxDraw {
             rect,
             kind,
@@ -475,8 +510,16 @@ impl Scene {
             accent: pres.accent,
             border,
             ring,
-            header_h: if node.layout.shape == NodeShape::Card { m.header_h } else { 0.0 },
-            radius: if node.layout.shape == NodeShape::Pill { m.pill_height * 0.5 } else { m.corner_radius },
+            header_h: if node.layout.shape == NodeShape::Card {
+                m.header_h
+            } else {
+                0.0
+            },
+            radius: if node.layout.shape == NodeShape::Pill {
+                m.pill_height * 0.5
+            } else {
+                m.corner_radius
+            },
             flags: f,
         });
 
@@ -485,7 +528,10 @@ impl Scene {
         }
 
         if node.layout.shape != NodeShape::Card {
-            if node.layout.shape == NodeShape::Pill && lod.shows_titles() && text_fits(m.label_font, p) {
+            if node.layout.shape == NodeShape::Pill
+                && lod.shows_titles()
+                && text_fits(m.label_font, p)
+            {
                 out.texts.push(TextDraw {
                     text: pres.title.clone(),
                     pos: rect.center(),
@@ -501,7 +547,13 @@ impl Scene {
         // header content
         let tint = if pres.disabled { 0.45 } else { 1.0 };
         let text_color = |c: Color| with_alpha(c, c[3] * tint);
-        if lod.shows_titles() && text_fits(m.title_font, p) {
+        // Summary tier: titles are enlarged so they stay readable as the card shrinks.
+        let title_size = if lod == LodTier::Summary {
+            (7.5 / p.view.zoom).clamp(m.title_font, m.header_h * 0.7)
+        } else {
+            m.title_font
+        };
+        if lod.shows_titles() && text_fits(title_size, p) {
             let mut x = rect.min.x + m.header_pad_x;
             if let Some(icon) = pres.icon {
                 let ir = Rect::from_pos_size(
@@ -520,22 +572,28 @@ impl Scene {
                     radius: 3.5,
                     flags: 0,
                 });
-                out.texts.push(TextDraw {
-                    text: icon.to_string(),
-                    pos: ir.center(),
-                    size: m.icon_size * 0.72,
-                    color: text_color(pres.accent),
-                    align: TextAlign::Center,
-                    bold: true,
-                });
+                if lod == LodTier::Detail {
+                    out.texts.push(TextDraw {
+                        text: icon.to_string(),
+                        pos: ir.center(),
+                        size: m.icon_size * 0.72,
+                        color: text_color(pres.accent),
+                        align: TextAlign::Center,
+                        bold: true,
+                    });
+                }
                 x += m.icon_size + 6.0;
             }
-            let right_pad = if pres.header_output.is_some() { m.pin_inset + m.pin_size * 0.5 + 8.0 } else { m.header_pad_x };
+            let right_pad = if pres.header_output.is_some() {
+                m.pin_inset + m.pin_size * 0.5 + 8.0
+            } else {
+                m.header_pad_x
+            };
             let max_w = (rect.max.x - right_pad - x).max(0.0);
             out.texts.push(TextDraw {
-                text: fit_text(measure, &pres.title, m.title_font, max_w),
+                text: fit_text(measure, &pres.title, title_size, max_w),
                 pos: Vec2::new(x, rect.min.y + m.header_h * 0.5),
-                size: m.title_font,
+                size: title_size,
                 color: text_color(theme.text),
                 align: TextAlign::Left,
                 bold: true,
@@ -551,10 +609,18 @@ impl Scene {
                         continue;
                     }
                     let edge = m.pin_inset + m.pin_size * 0.5 + m.label_gap;
-                    let lw = |s: &str| measure.width(s, m.label_font).min(crate::scene::MAX_LABEL_WIDTH);
+                    let lw = |s: &str| {
+                        measure
+                            .width(s, m.label_font)
+                            .min(crate::scene::MAX_LABEL_WIDTH)
+                    };
                     if let Some(i) = input {
                         let label = &node.inputs[i].label;
-                        let max_w = rr.width() - edge - output.map_or(m.header_pad_x, |o| lw(&node.outputs[o].label) + edge + m.column_gap);
+                        let max_w = rr.width()
+                            - edge
+                            - output.map_or(m.header_pad_x, |o| {
+                                lw(&node.outputs[o].label) + edge + m.column_gap
+                            });
                         out.texts.push(TextDraw {
                             text: fit_text(measure, label, m.label_font, max_w.max(0.0)),
                             pos: Vec2::new(rr.min.x + edge, rr.center().y),
@@ -566,7 +632,11 @@ impl Scene {
                     }
                     if let Some(o) = output {
                         let label = &node.outputs[o].label;
-                        let max_w = rr.width() - edge - input.map_or(m.header_pad_x, |i| lw(&node.inputs[i].label) + edge + m.column_gap);
+                        let max_w = rr.width()
+                            - edge
+                            - input.map_or(m.header_pad_x, |i| {
+                                lw(&node.inputs[i].label) + edge + m.column_gap
+                            });
                         out.texts.push(TextDraw {
                             text: fit_text(measure, label, m.label_font, max_w.max(0.0)),
                             pos: Vec2::new(rr.max.x - edge, rr.center().y),
@@ -594,21 +664,38 @@ impl Scene {
                         radius: 4.0,
                         flags: f & flags::DISABLED,
                     });
-                    out.previews.push(PreviewSlot { node: node.id.clone(), slot, rect: well });
+                    out.previews.push(PreviewSlot {
+                        node: node.id.clone(),
+                        slot,
+                        rect: well,
+                    });
                 }
             }
         }
     }
 
-    fn draw_pins(&self, ni: usize, p: &DrawParams, st: &InteractionState, lod: LodTier, out: &mut DrawData) {
+    fn draw_pins(
+        &self,
+        ni: usize,
+        p: &DrawParams,
+        st: &InteractionState,
+        lod: LodTier,
+        out: &mut DrawData,
+    ) {
         let node = &self.nodes[ni];
         let m = &self.metrics;
         let theme = &p.theme;
         let dragging = st.connecting.as_ref();
         for side in [PinSide::Input, PinSide::Output] {
             for (pi, pin) in node.pins(side).iter().enumerate() {
-                let Some(center) = node.pin_pos(side, pi) else { continue };
-                let addr = PinAddr { node: ni, side, pin: pi };
+                let Some(center) = node.pin_pos(side, pi) else {
+                    continue;
+                };
+                let addr = PinAddr {
+                    node: ni,
+                    side,
+                    pin: pi,
+                };
                 let mut f = 0;
                 if pin.connected {
                     f |= flags::CONNECTED;
@@ -648,12 +735,25 @@ impl Scene {
                 });
                 // Tail: the wire passes under the card, so continue it from the
                 // card edge to the pin centre over the card surface.
-                if pin.connected && node.layout.shape == NodeShape::Card && lod != LodTier::Overview {
-                    let edge_x = if side == PinSide::Input { node.pos.x } else { node.pos.x + node.layout.size.x };
+                if pin.connected && node.layout.shape == NodeShape::Card && lod != LodTier::Overview
+                {
+                    let edge_x = if side == PinSide::Input {
+                        node.pos.x
+                    } else {
+                        node.pos.x + node.layout.size.x
+                    };
                     let edge = Vec2::new(edge_x, center.y);
-                    let (a, b) = if side == PinSide::Input { (edge, center) } else { (center, edge) };
+                    let (a, b) = if side == PinSide::Input {
+                        (edge, center)
+                    } else {
+                        (center, edge)
+                    };
                     let focus = st.selected_nodes.contains(&node.id);
-                    let tail_color = if focus { color } else { dimmed(theme, color, 0.22) };
+                    let tail_color = if focus {
+                        color
+                    } else {
+                        dimmed(theme, color, 0.22)
+                    };
                     out.tails.push(WireDraw {
                         shape: WireShape::straight(a, b),
                         color: tail_color,

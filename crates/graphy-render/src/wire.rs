@@ -42,19 +42,31 @@ impl WireShape {
         // Forward wires leave and arrive horizontally with a handle that grows
         // with distance; backward wires get a longer handle so the S curve
         // clears both nodes.
-        let handle = if dx >= 0.0 { (dx * 0.5).max(36.0) } else { 36.0 + (-dx) * 0.55 };
+        let handle = if dx >= 0.0 {
+            (dx * 0.5).max(36.0)
+        } else {
+            36.0 + (-dx) * 0.55
+        };
         let c1 = Vec2::new(from.x + handle, from.y);
         let c2 = Vec2::new(to.x - handle, to.y);
         let mut pts = [Vec2::ZERO; 6];
         pts[..4].copy_from_slice(&[from, c1, c2, to]);
-        WireShape { routing: WireRouting::Bezier, n: 4, pts }
+        WireShape {
+            routing: WireRouting::Bezier,
+            n: 4,
+            pts,
+        }
     }
 
     /// A straight segment expressed as a degenerate cubic (pin tails).
     pub fn straight(from: Vec2, to: Vec2) -> WireShape {
         let mut pts = [Vec2::ZERO; 6];
         pts[..4].copy_from_slice(&[from, from.lerp(to, 1.0 / 3.0), from.lerp(to, 2.0 / 3.0), to]);
-        WireShape { routing: WireRouting::Bezier, n: 4, pts }
+        WireShape {
+            routing: WireRouting::Bezier,
+            n: 4,
+            pts,
+        }
     }
 
     pub fn angular(from: Vec2, to: Vec2) -> WireShape {
@@ -63,10 +75,18 @@ impl WireShape {
         if dx >= STUB * 1.6 {
             let mx = from.x + dx * 0.5;
             pts[..4].copy_from_slice(&[from, Vec2::new(mx, from.y), Vec2::new(mx, to.y), to]);
-            WireShape { routing: WireRouting::Angular, n: 4, pts }
+            WireShape {
+                routing: WireRouting::Angular,
+                n: 4,
+                pts,
+            }
         } else {
             let dy = to.y - from.y;
-            let my = if dy.abs() >= 40.0 { from.y + dy * 0.5 } else { from.y.max(to.y) + 48.0 };
+            let my = if dy.abs() >= 40.0 {
+                from.y + dy * 0.5
+            } else {
+                from.y.max(to.y) + 48.0
+            };
             pts = [
                 from,
                 Vec2::new(from.x + STUB, from.y),
@@ -75,7 +95,11 @@ impl WireShape {
                 Vec2::new(to.x - STUB, to.y),
                 to,
             ];
-            WireShape { routing: WireRouting::Angular, n: 6, pts }
+            WireShape {
+                routing: WireRouting::Angular,
+                n: 6,
+                pts,
+            }
         }
     }
 
@@ -84,7 +108,10 @@ impl WireShape {
     }
 
     pub fn bounds(&self) -> Rect {
-        let mut r = Rect { min: self.pts[0], max: self.pts[0] };
+        let mut r = Rect {
+            min: self.pts[0],
+            max: self.pts[0],
+        };
         for p in self.waypoints() {
             r.min = Vec2::new(r.min.x.min(p.x), r.min.y.min(p.y));
             r.max = Vec2::new(r.max.x.max(p.x), r.max.y.max(p.y));
@@ -147,7 +174,11 @@ impl WireShape {
 
 fn unit(v: Vec2) -> Vec2 {
     let l = v.length();
-    if l < 1e-6 { Vec2::ZERO } else { v * (1.0 / l) }
+    if l < 1e-6 {
+        Vec2::ZERO
+    } else {
+        v * (1.0 / l)
+    }
 }
 
 pub fn cubic(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: f32) -> Vec2 {

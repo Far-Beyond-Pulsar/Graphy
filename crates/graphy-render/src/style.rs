@@ -89,6 +89,10 @@ pub struct WireWeights {
 
 impl Default for WireWeights {
     fn default() -> Self {
-        Self { base: 1.7, emphasis: 2.6, dim: 1.3 }
+        Self {
+            base: 1.7,
+            emphasis: 2.6,
+            dim: 1.3,
+        }
     }
 }

@@ -19,7 +19,10 @@ pub struct ViewTransform {
 
 impl Default for ViewTransform {
     fn default() -> Self {
-        Self { pan: Vec2::ZERO, zoom: 1.0 }
+        Self {
+            pan: Vec2::ZERO,
+            zoom: 1.0,
+        }
     }
 }
 
@@ -33,7 +36,10 @@ impl ViewTransform {
     }
 
     pub fn graph_rect_to_screen(&self, r: Rect) -> Rect {
-        Rect { min: self.graph_to_screen(r.min), max: self.graph_to_screen(r.max) }
+        Rect {
+            min: self.graph_to_screen(r.min),
+            max: self.graph_to_screen(r.max),
+        }
     }
 
     /// Pans by a screen-space delta (a drag of the canvas).
@@ -66,12 +72,20 @@ impl ViewTransform {
     /// Fits `bounds` into the viewport with `margin_px` around it, centred.
     /// `max_zoom` keeps a single small node from being blown up.
     pub fn framing(bounds: Rect, viewport: Vec2, margin_px: f32, max_zoom: f32) -> ViewTransform {
-        let avail = Vec2::new((viewport.x - margin_px * 2.0).max(1.0), (viewport.y - margin_px * 2.0).max(1.0));
+        let avail = Vec2::new(
+            (viewport.x - margin_px * 2.0).max(1.0),
+            (viewport.y - margin_px * 2.0).max(1.0),
+        );
         let size = Vec2::new(bounds.width().max(1.0), bounds.height().max(1.0));
-        let zoom = (avail.x / size.x).min(avail.y / size.y).clamp(MIN_ZOOM, max_zoom.min(MAX_ZOOM));
+        let zoom = (avail.x / size.x)
+            .min(avail.y / size.y)
+            .clamp(MIN_ZOOM, max_zoom.min(MAX_ZOOM));
         let center = bounds.center();
         // the viewport centre maps to the centre of the bounds
-        let pan = Vec2::new(viewport.x * 0.5 / zoom - center.x, viewport.y * 0.5 / zoom - center.y);
+        let pan = Vec2::new(
+            viewport.x * 0.5 / zoom - center.x,
+            viewport.y * 0.5 / zoom - center.y,
+        );
         ViewTransform { pan, zoom }
     }
 }

@@ -106,7 +106,11 @@ pub trait Presenter {
     }
 
     fn pin_label(&self, _node: &NodeInstance, pin: &PinInstance, _side: PinSide) -> String {
-        if pin.pin.name.is_empty() { pin.id.clone() } else { pin.pin.name.clone() }
+        if pin.pin.name.is_empty() {
+            pin.id.clone()
+        } else {
+            pin.pin.name.clone()
+        }
     }
 
     /// Height of a pin row; override for variable-height rows.
@@ -123,7 +127,9 @@ pub trait Presenter {
     }
 
     fn comment(&self, _index: usize, _comment: &GraphComment) -> CommentPresentation {
-        CommentPresentation { accent: rgba(0xa3, 0xa3, 0xa3, 1.0) }
+        CommentPresentation {
+            accent: rgba(0xa3, 0xa3, 0xa3, 1.0),
+        }
     }
 }
 
@@ -162,7 +168,10 @@ pub fn category_accent(category: &str) -> Color {
 
 /// `"math::add_float"` -> `"Add Float"`.
 pub fn prettify(node_type: &str) -> String {
-    let base = node_type.rsplit(|c| c == ':' || c == '.').next().unwrap_or(node_type);
+    let base = node_type
+        .rsplit(|c| c == ':' || c == '.')
+        .next()
+        .unwrap_or(node_type);
     let mut out = String::with_capacity(base.len());
     let mut upper = true;
     for c in base.chars() {
@@ -197,7 +206,11 @@ fn default_node(node: &NodeInstance) -> NodePresentation {
 /// accent palette so each distinct type is stable and distinguishable.
 pub fn default_pin_style(data_type: &DataType) -> PinStyle {
     match data_type {
-        DataType::Exec => PinStyle { shape: PinShape::Arrow, ringed: false, color: rgba(0xe4, 0xe4, 0xe7, 1.0) },
+        DataType::Exec => PinStyle {
+            shape: PinShape::Arrow,
+            ringed: false,
+            color: rgba(0xe4, 0xe4, 0xe7, 1.0),
+        },
         DataType::Data(info) => {
             let t = info.type_string.as_str();
             let color = match t {
@@ -214,8 +227,16 @@ pub fn default_pin_style(data_type: &DataType) -> PinStyle {
                 }
             };
             let ringed = t.starts_with("Vec<") || t.starts_with('[');
-            let shape = if t == "?" { PinShape::Diamond } else { PinShape::Circle };
-            PinStyle { shape, ringed, color }
+            let shape = if t == "?" {
+                PinShape::Diamond
+            } else {
+                PinShape::Circle
+            };
+            PinStyle {
+                shape,
+                ringed,
+                color,
+            }
         }
     }
 }

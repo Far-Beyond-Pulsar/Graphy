@@ -40,7 +40,10 @@ pub struct HitTolerance {
 
 impl Default for HitTolerance {
     fn default() -> Self {
-        Self { pin_px: 9.0, wire_px: 6.0 }
+        Self {
+            pin_px: 9.0,
+            wire_px: 6.0,
+        }
     }
 }
 
@@ -54,10 +57,19 @@ impl Scene {
             let node = &self.nodes[ni];
             for side in [PinSide::Input, PinSide::Output] {
                 for (pi, _) in node.pins(side).iter().enumerate() {
-                    let Some(c) = node.pin_pos(side, pi) else { continue };
+                    let Some(c) = node.pin_pos(side, pi) else {
+                        continue;
+                    };
                     let d = c.distance(p);
                     if d <= radius && best.map_or(true, |(bd, _)| d < bd) {
-                        best = Some((d, PinAddr { node: ni, side, pin: pi }));
+                        best = Some((
+                            d,
+                            PinAddr {
+                                node: ni,
+                                side,
+                                pin: pi,
+                            },
+                        ));
                     }
                 }
             }

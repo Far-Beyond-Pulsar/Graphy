@@ -33,18 +33,18 @@ pub mod view;
 pub mod wire;
 
 pub use draw::{
-    flags, BoxDraw, BoxKind, CanvasDraw, ConnectPreview, DrawData, DrawParams, DrawStats, InteractionState, PinDraw,
-    PreviewSlot, TextAlign, TextDraw, WireDraw,
+    flags, BoxDraw, BoxKind, CanvasDraw, ConnectPreview, DrawData, DrawParams, DrawStats,
+    InteractionState, PinDraw, PreviewSlot, TextAlign, TextDraw, WireDraw,
 };
 pub use geom::{Color, Rect, Vec2};
 pub use hit::{Hit, HitTolerance, NodePart, PinAddr};
 pub use layout::{
-    ExtraRow, LayoutMetrics, NodeLayout, NodeShape, NodeSpec, PinLayout, PinSide, RowContent, RowLayout, RowPosition,
-    RowSpec,
+    ExtraRow, LayoutMetrics, NodeLayout, NodeShape, NodeSpec, PinLayout, PinSide, RowContent,
+    RowLayout, RowPosition, RowSpec,
 };
 pub use presenter::{
-    category_accent, default_pin_style, prettify, CommentPresentation, DefaultPresenter, NodePresentation, PinShape,
-    PinStyle, Presenter, WireStyle,
+    category_accent, default_pin_style, prettify, CommentPresentation, DefaultPresenter,
+    NodePresentation, PinShape, PinStyle, Presenter, WireStyle,
 };
 pub use scene::{PinInfo, Scene, SceneComment, SceneNode, SceneWire};
 pub use style::{Theme, WireWeights};

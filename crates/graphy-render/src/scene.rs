@@ -119,14 +119,24 @@ impl Scene {
 
     /// Rebuilds everything from the document. Node draw order is the ids' sort
     /// order, which keeps scenes deterministic across hash-map iteration.
-    pub fn rebuild(&mut self, graph: &GraphDescription, presenter: &dyn Presenter, measure: &dyn TextMeasure) {
+    pub fn rebuild(
+        &mut self,
+        graph: &GraphDescription,
+        presenter: &dyn Presenter,
+        measure: &dyn TextMeasure,
+    ) {
         let mut ids: Vec<&String> = graph.nodes.keys().collect();
         ids.sort();
         self.nodes = ids
             .iter()
             .map(|id| build_node(&graph.nodes[*id], &self.metrics, presenter, measure))
             .collect();
-        self.node_ix = self.nodes.iter().enumerate().map(|(i, n)| (n.id.clone(), i)).collect();
+        self.node_ix = self
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (n.id.clone(), i))
+            .collect();
         self.comments = graph
             .comments
             .iter()
@@ -141,10 +151,18 @@ impl Scene {
             })
             .collect();
         self.rebuild_wires(graph, presenter);
-        self.spatial.nodes.rebuild(self.nodes.iter().enumerate().map(|(i, n)| Entry { index: i, rect: n.rect() }));
+        self.spatial
+            .nodes
+            .rebuild(self.nodes.iter().enumerate().map(|(i, n)| Entry {
+                index: i,
+                rect: n.rect(),
+            }));
         self.spatial
             .comments
-            .rebuild(self.comments.iter().enumerate().map(|(i, c)| Entry { index: i, rect: c.rect }));
+            .rebuild(self.comments.iter().enumerate().map(|(i, c)| Entry {
+                index: i,
+                rect: c.rect,
+            }));
     }
 
     /// Resolves connections to pin indices, recomputes wire shapes and the
@@ -158,12 +176,26 @@ impl Scene {
             }
         }
         for (ci, c) in graph.connections.iter().enumerate() {
-            let (Some(&from_node), Some(&to_node)) = (self.node_ix.get(&c.source_node), self.node_ix.get(&c.target_node))
+            let (Some(&from_node), Some(&to_node)) = (
+                self.node_ix.get(&c.source_node),
+                self.node_ix.get(&c.target_node),
+            ) else {
+                continue;
+            };
+            let Some(from_pin) = self.nodes[from_node]
+                .outputs
+                .iter()
+                .position(|p| p.id == c.source_pin)
             else {
                 continue;
             };
-            let Some(from_pin) = self.nodes[from_node].outputs.iter().position(|p| p.id == c.source_pin) else { continue };
-            let Some(to_pin) = self.nodes[to_node].inputs.iter().position(|p| p.id == c.target_pin) else { continue };
+            let Some(to_pin) = self.nodes[to_node]
+                .inputs
+                .iter()
+                .position(|p| p.id == c.target_pin)
+            else {
+                continue;
+            };
             self.nodes[from_node].outputs[from_pin].connected = true;
             self.nodes[to_node].inputs[to_pin].connected = true;
             let style = presenter.wire(c, &self.nodes[from_node].outputs[from_pin].style);
@@ -189,13 +221,20 @@ impl Scene {
         }
         self.spatial
             .wires
-            .rebuild(self.wires.iter().enumerate().map(|(i, w)| Entry { index: i, rect: w.shape.bounds().expand(4.0) }));
+            .rebuild(self.wires.iter().enumerate().map(|(i, w)| Entry {
+                index: i,
+                rect: w.shape.bounds().expand(4.0),
+            }));
     }
 
     fn reshape_wire(&mut self, wi: usize) -> Rect {
         let w = &self.wires[wi];
-        let from = self.nodes[w.from_node].pin_pos(PinSide::Output, w.from_pin).unwrap_or_default();
-        let to = self.nodes[w.to_node].pin_pos(PinSide::Input, w.to_pin).unwrap_or_default();
+        let from = self.nodes[w.from_node]
+            .pin_pos(PinSide::Output, w.from_pin)
+            .unwrap_or_default();
+        let to = self.nodes[w.to_node]
+            .pin_pos(PinSide::Input, w.to_pin)
+            .unwrap_or_default();
         let shape = WireShape::new(w.style.routing, from, to);
         let bounds = shape.bounds().expand(4.0);
         self.wires[wi].shape = shape;
@@ -207,18 +246,30 @@ impl Scene {
     /// Moves a node in the scene only (drag preview, or applying a
     /// `NodeMoved` change) and updates its wires and index entries.
     pub fn set_node_position(&mut self, index: usize, pos: Vec2) {
-        let old = Entry { index, rect: self.nodes[index].rect() };
+        let old = Entry {
+            index,
+            rect: self.nodes[index].rect(),
+        };
         self.nodes[index].pos = pos;
         self.spatial.nodes.update(old, self.nodes[index].rect());
         for wi in self.adjacency[index].clone() {
             let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
             let new_bounds = self.reshape_wire(wi);
-            self.spatial.wires.update(Entry { index: wi, rect: old_bounds }, new_bounds);
+            self.spatial.wires.update(
+                Entry {
+                    index: wi,
+                    rect: old_bounds,
+                },
+                new_bounds,
+            );
         }
     }
 
     pub fn set_comment_rect(&mut self, index: usize, rect: Rect) {
-        let old = Entry { index, rect: self.comments[index].rect };
+        let old = Entry {
+            index,
+            rect: self.comments[index].rect,
+        };
         self.comments[index].rect = rect;
         self.spatial.comments.update(old, rect);
     }
@@ -233,10 +284,12 @@ impl Scene {
         presenter: &dyn Presenter,
         measure: &dyn TextMeasure,
     ) {
-        let structural = changes
-            .changes
-            .iter()
-            .any(|c| matches!(c, GraphChange::NodeAdded(_) | GraphChange::NodeRemoved { .. }));
+        let structural = changes.changes.iter().any(|c| {
+            matches!(
+                c,
+                GraphChange::NodeAdded(_) | GraphChange::NodeRemoved { .. }
+            )
+        });
         if structural || changes.changes.iter().any(|c| !is_incremental(c)) {
             self.rebuild(graph, presenter, measure);
             return;
@@ -251,18 +304,24 @@ impl Scene {
                 }
                 GraphChange::CommentMoved { index, to, .. } => {
                     if let Some(c) = self.comments.get(*index) {
-                        let r = Rect::from_pos_size(Vec2::new(to.0 as f32, to.1 as f32), c.rect.size());
+                        let r =
+                            Rect::from_pos_size(Vec2::new(to.0 as f32, to.1 as f32), c.rect.size());
                         self.set_comment_rect(*index, r);
                     }
                 }
                 GraphChange::CommentResized { index, to, .. } => {
                     if let Some(c) = self.comments.get(*index) {
-                        let r = Rect::from_pos_size(c.rect.min, Vec2::new(to.0 as f32, to.1 as f32));
+                        let r =
+                            Rect::from_pos_size(c.rect.min, Vec2::new(to.0 as f32, to.1 as f32));
                         self.set_comment_rect(*index, r);
                     }
                 }
-                GraphChange::ConnectionAdded(_) | GraphChange::ConnectionRemoved(_) => wires_dirty = true,
-                GraphChange::PropertySet { node, .. } => self.refresh_node(graph, node, presenter, measure),
+                GraphChange::ConnectionAdded(_) | GraphChange::ConnectionRemoved(_) => {
+                    wires_dirty = true
+                }
+                GraphChange::PropertySet { node, .. } => {
+                    self.refresh_node(graph, node, presenter, measure)
+                }
                 GraphChange::PinsReplaced { node, .. } => {
                     self.refresh_node(graph, node, presenter, measure);
                     wires_dirty = true;
@@ -283,19 +342,34 @@ impl Scene {
         presenter: &dyn Presenter,
         measure: &dyn TextMeasure,
     ) {
-        let (Some(i), Some(node)) = (self.node_index(id), graph.nodes.get(id)) else { return };
-        let old = Entry { index: i, rect: self.nodes[i].rect() };
+        let (Some(i), Some(node)) = (self.node_index(id), graph.nodes.get(id)) else {
+            return;
+        };
+        let old = Entry {
+            index: i,
+            rect: self.nodes[i].rect(),
+        };
         let was_connected: Vec<(PinSide, String)> = self.nodes[i]
             .inputs
             .iter()
             .filter(|p| p.connected)
             .map(|p| (PinSide::Input, p.id.clone()))
-            .chain(self.nodes[i].outputs.iter().filter(|p| p.connected).map(|p| (PinSide::Output, p.id.clone())))
+            .chain(
+                self.nodes[i]
+                    .outputs
+                    .iter()
+                    .filter(|p| p.connected)
+                    .map(|p| (PinSide::Output, p.id.clone())),
+            )
             .collect();
         self.nodes[i] = build_node(node, &self.metrics, presenter, measure);
         for (side, pid) in &was_connected {
             let n = &mut self.nodes[i];
-            let list = if *side == PinSide::Input { &mut n.inputs } else { &mut n.outputs };
+            let list = if *side == PinSide::Input {
+                &mut n.inputs
+            } else {
+                &mut n.outputs
+            };
             if let Some(p) = list.iter_mut().find(|p| &p.id == pid) {
                 p.connected = true;
             }
@@ -304,7 +378,13 @@ impl Scene {
         for wi in self.adjacency.get(i).cloned().unwrap_or_default() {
             let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
             let new_bounds = self.reshape_wire(wi);
-            self.spatial.wires.update(Entry { index: wi, rect: old_bounds }, new_bounds);
+            self.spatial.wires.update(
+                Entry {
+                    index: wi,
+                    rect: old_bounds,
+                },
+                new_bounds,
+            );
         }
     }
 
@@ -331,7 +411,11 @@ impl Scene {
             .into_iter()
             .filter(|&i| {
                 let r = self.nodes[i].rect();
-                !contain || (r.min.x >= rect.min.x && r.min.y >= rect.min.y && r.max.x <= rect.max.x && r.max.y <= rect.max.y)
+                !contain
+                    || (r.min.x >= rect.min.x
+                        && r.min.y >= rect.min.y
+                        && r.max.x <= rect.max.x
+                        && r.max.y <= rect.max.y)
             })
             .collect()
     }
@@ -370,9 +454,13 @@ fn build_node(
 
     let label_w = |p: &PinInfo| measure.width(&p.label, m.label_font).min(MAX_LABEL_WIDTH);
     let header_output = presentation.header_output.filter(|h| *h < outputs.len());
-    let (rows, extra_min) = NodeSpec::build_rows(inputs.len(), outputs.len(), header_output, &presentation.extra_rows, |c| {
-        presenter.row_height(node, c, m)
-    });
+    let (rows, extra_min) = NodeSpec::build_rows(
+        inputs.len(),
+        outputs.len(),
+        header_output,
+        &presentation.extra_rows,
+        |c| presenter.row_height(node, c, m),
+    );
     // Rows carrying the header output's label would double-count; the header
     // output has no label slot.
     let mut output_widths: Vec<f32> = outputs.iter().map(label_w).collect();
@@ -382,7 +470,9 @@ fn build_node(
     let title_width = if presentation.shape == NodeShape::Reroute {
         0.0
     } else {
-        measure.width(&presentation.title, m.title_font).min(MAX_TITLE_WIDTH)
+        measure
+            .width(&presentation.title, m.title_font)
+            .min(MAX_TITLE_WIDTH)
     };
     let spec = NodeSpec {
         shape: presentation.shape,

@@ -98,7 +98,10 @@ pub enum NodeShape {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowContent {
     /// An input pin on the left and/or an output pin on the right.
-    Pins { input: Option<usize>, output: Option<usize> },
+    Pins {
+        input: Option<usize>,
+        output: Option<usize>,
+    },
     /// Host content (texture preview, inline widget, custom body) identified by
     /// a profile-chosen slot id.
     Custom { slot: u32 },
@@ -164,7 +167,10 @@ impl NodeSpec {
         let mut min_width = 0.0f32;
         let push_extras = |rows: &mut Vec<RowSpec>, pos: RowPosition, min_width: &mut f32| {
             for e in extras.iter().filter(|e| e.position == pos) {
-                rows.push(RowSpec { content: RowContent::Custom { slot: e.slot }, height: e.height });
+                rows.push(RowSpec {
+                    content: RowContent::Custom { slot: e.slot },
+                    height: e.height,
+                });
                 *min_width = min_width.max(e.min_width);
             }
         };
@@ -227,8 +233,20 @@ impl NodeLayout {
             size: Vec2::new(s, s),
             header: Rect::default(),
             rows: Vec::new(),
-            inputs: vec![PinLayout { center: c, row: None }; spec.input_label_widths.len().max(1)],
-            outputs: vec![PinLayout { center: c, row: None }; spec.output_label_widths.len().max(1)],
+            inputs: vec![
+                PinLayout {
+                    center: c,
+                    row: None
+                };
+                spec.input_label_widths.len().max(1)
+            ],
+            outputs: vec![
+                PinLayout {
+                    center: c,
+                    row: None
+                };
+                spec.output_label_widths.len().max(1)
+            ],
         }
     }
 
@@ -240,56 +258,128 @@ impl NodeLayout {
             size: Vec2::new(w, h),
             header: Rect::from_pos_size(Vec2::ZERO, Vec2::new(w, h)),
             rows: Vec::new(),
-            inputs: vec![PinLayout { center: Vec2::new(0.0, h * 0.5), row: None }; spec.input_label_widths.len().max(1)],
-            outputs: vec![PinLayout { center: Vec2::new(w, h * 0.5), row: None }; spec.output_label_widths.len().max(1)],
+            inputs: vec![
+                PinLayout {
+                    center: Vec2::new(0.0, h * 0.5),
+                    row: None
+                };
+                spec.input_label_widths.len().max(1)
+            ],
+            outputs: vec![
+                PinLayout {
+                    center: Vec2::new(w, h * 0.5),
+                    row: None
+                };
+                spec.output_label_widths.len().max(1)
+            ],
         }
     }
 
     fn card(spec: &NodeSpec, m: &LayoutMetrics) -> NodeLayout {
         // ---- width -------------------------------------------------------
-        let icon_w = if spec.has_icon { m.icon_size + 6.0 } else { 0.0 };
-        let header_out_w = if spec.header_output.is_some() { m.pin_inset + m.pin_size * 0.5 + 8.0 } else { 0.0 };
+        let icon_w = if spec.has_icon {
+            m.icon_size + 6.0
+        } else {
+            0.0
+        };
+        let header_out_w = if spec.header_output.is_some() {
+            m.pin_inset + m.pin_size * 0.5 + 8.0
+        } else {
+            0.0
+        };
         let header_req = m.header_pad_x * 2.0 + icon_w + spec.title_width + header_out_w;
         let mut body_req = 0.0f32;
         for row in &spec.rows {
             if let RowContent::Pins { input, output } = row.content {
                 let in_w = input.and_then(|i| spec.input_label_widths.get(i)).copied();
-                let out_w = output.and_then(|o| spec.output_label_widths.get(o)).copied();
-                let side = |w: Option<f32>| w.map_or(0.0, |w| m.pin_inset + m.pin_size * 0.5 + m.label_gap + w);
-                let gap = if in_w.is_some() && out_w.is_some() { m.column_gap } else { 0.0 };
+                let out_w = output
+                    .and_then(|o| spec.output_label_widths.get(o))
+                    .copied();
+                let side = |w: Option<f32>| {
+                    w.map_or(0.0, |w| m.pin_inset + m.pin_size * 0.5 + m.label_gap + w)
+                };
+                let gap = if in_w.is_some() && out_w.is_some() {
+                    m.column_gap
+                } else {
+                    0.0
+                };
                 body_req = body_req.max(side(in_w) + side(out_w) + gap);
             }
         }
-        let width = m.snap_up(header_req.max(body_req).max(spec.min_width).max(m.min_width));
+        let width = m.snap_up(
+            header_req
+                .max(body_req)
+                .max(spec.min_width)
+                .max(m.min_width),
+        );
 
         // ---- vertical flow -----------------------------------------------
         let header = Rect::from_pos_size(Vec2::ZERO, Vec2::new(width, m.header_h));
         let mut y = m.header_h + m.body_pad_y;
         let mut rows = Vec::with_capacity(spec.rows.len());
-        let mut inputs = vec![PinLayout { center: Vec2::ZERO, row: None }; spec.input_label_widths.len()];
-        let mut outputs = vec![PinLayout { center: Vec2::ZERO, row: None }; spec.output_label_widths.len()];
+        let mut inputs = vec![
+            PinLayout {
+                center: Vec2::ZERO,
+                row: None
+            };
+            spec.input_label_widths.len()
+        ];
+        let mut outputs = vec![
+            PinLayout {
+                center: Vec2::ZERO,
+                row: None
+            };
+            spec.output_label_widths.len()
+        ];
         for (i, row) in spec.rows.iter().enumerate() {
             let rect = Rect::from_pos_size(Vec2::new(0.0, y), Vec2::new(width, row.height));
             if let RowContent::Pins { input, output } = row.content {
                 let cy = y + row.height * 0.5;
                 if let Some(slot) = input.and_then(|k| inputs.get_mut(k)) {
-                    *slot = PinLayout { center: Vec2::new(m.pin_inset, cy), row: Some(i) };
+                    *slot = PinLayout {
+                        center: Vec2::new(m.pin_inset, cy),
+                        row: Some(i),
+                    };
                 }
                 if let Some(slot) = output.and_then(|k| outputs.get_mut(k)) {
-                    *slot = PinLayout { center: Vec2::new(width - m.pin_inset, cy), row: Some(i) };
+                    *slot = PinLayout {
+                        center: Vec2::new(width - m.pin_inset, cy),
+                        row: Some(i),
+                    };
                 }
             }
-            rows.push(RowLayout { rect, content: row.content });
+            rows.push(RowLayout {
+                rect,
+                content: row.content,
+            });
             y += row.height + m.row_gap;
         }
         if let Some(h) = spec.header_output {
             if let Some(slot) = outputs.get_mut(h) {
-                *slot = PinLayout { center: Vec2::new(width - m.pin_inset, m.header_h * 0.5), row: None };
+                *slot = PinLayout {
+                    center: Vec2::new(width - m.pin_inset, m.header_h * 0.5),
+                    row: None,
+                };
             }
         }
-        let body_h = if spec.rows.is_empty() { 0.0 } else { y - m.row_gap - (m.header_h + m.body_pad_y) };
-        let height = m.snap_up(m.header_h + m.body_pad_y * 2.0 + body_h);
-        NodeLayout { shape: NodeShape::Card, size: Vec2::new(width, height), header, rows, inputs, outputs }
+        let body_h = if spec.rows.is_empty() {
+            0.0
+        } else {
+            y - m.row_gap - (m.header_h + m.body_pad_y)
+        };
+        let height = if spec.rows.is_empty() {
+            m.snap_up(m.header_h + m.body_pad_y)
+        } else {
+            m.snap_up(m.header_h + m.body_pad_y * 2.0 + body_h)
+        };
+        NodeLayout {
+            shape: NodeShape::Card,
+            size: Vec2::new(width, height),
+            header,
+            rows,
+            inputs,
+            outputs,
+        }
     }
 
     pub fn pin(&self, side: PinSide, index: usize) -> Option<&PinLayout> {

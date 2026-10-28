@@ -15,7 +15,7 @@
 # once they contain code. They sit above `graphy`; compiler-only consumers
 # (psgc, blueprint_compiler, pulsar_game) never pull them in.
 [workspace]
-members = [".", "crates/graphy-blueprint", "crates/graphy-reflection", "crates/graphy-render"]
+members = [".", "crates/graphy-blueprint", "crates/graphy-reflection", "crates/graphy-render", "crates/graphy-render-wgpu"]
 resolver = "2"
 
 [package]

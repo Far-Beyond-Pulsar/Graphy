@@ -18,7 +18,10 @@ pub struct Entry {
 impl RTreeObject for Entry {
     type Envelope = AABB<[f32; 2]>;
     fn envelope(&self) -> Self::Envelope {
-        AABB::from_corners([self.rect.min.x, self.rect.min.y], [self.rect.max.x, self.rect.max.y])
+        AABB::from_corners(
+            [self.rect.min.x, self.rect.min.y],
+            [self.rect.max.x, self.rect.max.y],
+        )
     }
 }
 
@@ -53,7 +56,10 @@ impl Layer {
             return;
         }
         self.tree.remove(&old);
-        self.tree.insert(Entry { index: old.index, rect: new_rect });
+        self.tree.insert(Entry {
+            index: old.index,
+            rect: new_rect,
+        });
     }
 
     pub fn len(&self) -> usize {
@@ -68,7 +74,11 @@ impl Layer {
     /// descending when `top_first`.
     pub fn query(&self, rect: Rect, top_first: bool) -> Vec<usize> {
         let env = AABB::from_corners([rect.min.x, rect.min.y], [rect.max.x, rect.max.y]);
-        let mut out: Vec<usize> = self.tree.locate_in_envelope_intersecting(&env).map(|e| e.index).collect();
+        let mut out: Vec<usize> = self
+            .tree
+            .locate_in_envelope_intersecting(&env)
+            .map(|e| e.index)
+            .collect();
         out.sort_unstable();
         if top_first {
             out.reverse();
@@ -90,7 +100,10 @@ mod tests {
     use crate::geom::Vec2;
 
     fn e(i: usize, x: f32, y: f32) -> Entry {
-        Entry { index: i, rect: Rect::from_pos_size(Vec2::new(x, y), Vec2::new(10.0, 10.0)) }
+        Entry {
+            index: i,
+            rect: Rect::from_pos_size(Vec2::new(x, y), Vec2::new(10.0, 10.0)),
+        }
     }
 
     #[test]
@@ -108,7 +121,18 @@ mod tests {
         let old = e(0, 0.0, 0.0);
         l.insert(old);
         l.update(old, e(0, 300.0, 300.0).rect);
-        assert!(l.query(Rect::from_pos_size(Vec2::ZERO, Vec2::new(20.0, 20.0)), false).is_empty());
-        assert_eq!(l.query(Rect::from_pos_size(Vec2::new(290.0, 290.0), Vec2::new(30.0, 30.0)), false), vec![0]);
+        assert!(l
+            .query(
+                Rect::from_pos_size(Vec2::ZERO, Vec2::new(20.0, 20.0)),
+                false
+            )
+            .is_empty());
+        assert_eq!(
+            l.query(
+                Rect::from_pos_size(Vec2::new(290.0, 290.0), Vec2::new(30.0, 30.0)),
+                false
+            ),
+            vec![0]
+        );
     }
 }

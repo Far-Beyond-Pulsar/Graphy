@@ -79,7 +79,10 @@ impl Rect {
 
     pub fn around(center: Vec2, radius: f32) -> Self {
         let r = Vec2::new(radius, radius);
-        Self { min: center - r, max: center + r }
+        Self {
+            min: center - r,
+            max: center + r,
+        }
     }
 
     pub fn width(&self) -> f32 {
@@ -103,7 +106,10 @@ impl Rect {
     }
 
     pub fn intersects(&self, o: &Rect) -> bool {
-        self.min.x <= o.max.x && self.max.x >= o.min.x && self.min.y <= o.max.y && self.max.y >= o.min.y
+        self.min.x <= o.max.x
+            && self.max.x >= o.min.x
+            && self.min.y <= o.max.y
+            && self.max.y >= o.min.y
     }
 
     pub fn expand(&self, by: f32) -> Rect {
@@ -114,7 +120,10 @@ impl Rect {
     }
 
     pub fn translate(&self, by: Vec2) -> Rect {
-        Rect { min: self.min + by, max: self.max + by }
+        Rect {
+            min: self.min + by,
+            max: self.max + by,
+        }
     }
 
     pub fn union(&self, o: &Rect) -> Rect {
