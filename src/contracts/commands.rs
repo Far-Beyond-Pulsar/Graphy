@@ -18,6 +18,10 @@ pub enum GraphCommand {
     /// Removes the node and every connection touching it.
     RemoveNode { id: String },
     MoveNode { id: String, x: f64, y: f64 },
+    /// Moves the comment at `index` (comments have no ids; they are addressed by position).
+    MoveComment { index: usize, x: f64, y: f64 },
+    /// Resizes the comment at `index`.
+    ResizeComment { index: usize, width: f64, height: f64 },
     Connect(Connection),
     Disconnect(Connection),
     /// Sets (`Some`) or clears (`None`) a legacy constant property.
@@ -55,6 +59,16 @@ pub enum GraphChange {
         from: (f64, f64),
         to: (f64, f64),
     },
+    CommentMoved {
+        index: usize,
+        from: (f64, f64),
+        to: (f64, f64),
+    },
+    CommentResized {
+        index: usize,
+        from: (f64, f64),
+        to: (f64, f64),
+    },
     ConnectionAdded(Connection),
     ConnectionRemoved(IndexedConnection),
     PropertySet {
@@ -85,6 +99,8 @@ pub enum EditError {
     NoSuchNode(String),
     #[error("node '{0}' already exists")]
     DuplicateNode(String),
+    #[error("comment {0} does not exist")]
+    NoSuchComment(usize),
     #[error("pin '{pin}' does not exist on node '{node}' as an {side}")]
     NoSuchPin {
         node: String,
@@ -169,6 +185,24 @@ impl GraphCommand {
                     from,
                     to: (*x, *y),
                 }
+            }
+            GraphCommand::MoveComment { index, x, y } => {
+                let c = graph
+                    .comments
+                    .get_mut(*index)
+                    .ok_or(EditError::NoSuchComment(*index))?;
+                let from = (c.position.x, c.position.y);
+                c.position = Position { x: *x, y: *y };
+                GraphChange::CommentMoved { index: *index, from, to: (*x, *y) }
+            }
+            GraphCommand::ResizeComment { index, width, height } => {
+                let c = graph
+                    .comments
+                    .get_mut(*index)
+                    .ok_or(EditError::NoSuchComment(*index))?;
+                let from = c.size;
+                c.size = (*width, *height);
+                GraphChange::CommentResized { index: *index, from, to: (*width, *height) }
             }
             GraphCommand::Connect(c) => {
                 check_connect(graph, c)?;
@@ -321,6 +355,16 @@ impl ChangeSet {
                         };
                     }
                 }
+                GraphChange::CommentMoved { index, from, .. } => {
+                    if let Some(c) = graph.comments.get_mut(*index) {
+                        c.position = Position { x: from.0, y: from.1 };
+                    }
+                }
+                GraphChange::CommentResized { index, from, .. } => {
+                    if let Some(c) = graph.comments.get_mut(*index) {
+                        c.size = *from;
+                    }
+                }
                 GraphChange::ConnectionAdded(c) => {
                     if let Some(i) = graph.connections.iter().position(|e| same_edge(e, c)) {
                         graph.connections.remove(i);
@@ -378,6 +422,7 @@ impl ChangeSet {
                     }
                 }
                 GraphChange::NodeMoved { id, .. } => add(id),
+                GraphChange::CommentMoved { .. } | GraphChange::CommentResized { .. } => {}
                 GraphChange::ConnectionAdded(c) => {
                     add(&c.source_node);
                     add(&c.target_node);

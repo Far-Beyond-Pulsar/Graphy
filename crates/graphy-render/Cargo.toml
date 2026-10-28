@@ -1,0 +1,12 @@
+[package]
+name = "graphy-render"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pulsar Team"]
+description = "Headless graph canvas model: layout, view transform, spatial index, hit testing and draw data"
+license = "MIT"
+
+# Headless: no gpui, no wgpu. Backends (graphy-render-wgpu) consume `DrawData`.
+[dependencies]
+graphy = { path = "../.." }
+rstar = "0.12"
