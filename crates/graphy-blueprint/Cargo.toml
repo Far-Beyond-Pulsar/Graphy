@@ -1,8 +1,10 @@
 [package]
-name = "blueprint_graph"
+name = "graphy-blueprint"
 version = "0.1.0"
 edition = "2021"
-description = "GPUI-free authored Blueprint graph schema and library model"
+authors = ["Pulsar Team"]
+description = "GPUI-free authored Blueprint graph schema, codecs, legacy readers and library model"
+license = "MIT"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

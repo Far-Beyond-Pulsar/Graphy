@@ -1,3 +1,20 @@
+# Graphy workspace
+#
+# Dependency DAG (arrows point at dependencies; every crate is headless, none may
+# depend on gpui or wgpu):
+#
+#   graphy            document/compiler IR, stable ids, graph invariants, type
+#                     resolution, diagnostics, edit commands, analysis and codegen
+#   graphy-blueprint  authored Blueprint asset schema, codecs, legacy readers,
+#                     library and prefab models (leaf crate: serde, chrono, uuid)
+#
+# Render/UI crates (graphy-render, graphy-render-wgpu, graphy-gpui) are added only
+# once they contain code. They sit above `graphy`; compiler-only consumers
+# (psgc, blueprint_compiler, pulsar_game) never pull them in.
+[workspace]
+members = [".", "crates/graphy-blueprint"]
+resolver = "2"
+
 [package]
 name = "graphy"
 version = "0.1.0"

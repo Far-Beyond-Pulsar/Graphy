@@ -1,4 +1,4 @@
-use blueprint_graph::codec::deserialize_blueprint;
+use graphy_blueprint::codec::deserialize_blueprint;
 use serde_json::{json, Value};
 
 const FIXTURE: &str = include_str!("fixtures/graph_save.json");
