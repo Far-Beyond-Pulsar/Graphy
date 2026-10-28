@@ -7,12 +7,15 @@
 #                     resolution, diagnostics, edit commands, analysis and codegen
 #   graphy-blueprint  authored Blueprint asset schema, codecs, legacy readers,
 #                     library and prefab models (leaf crate: serde, chrono, uuid)
+#   graphy-reflection adapter from Pulsar runtime reflection (pulsar_reflection) to
+#                     TypeResolver and NodeMetadata  ->  graphy, pulsar_reflection;
+#                     the only crate that knows Pulsar, so graphy stays free of it
 #
 # Render/UI crates (graphy-render, graphy-render-wgpu, graphy-gpui) are added only
 # once they contain code. They sit above `graphy`; compiler-only consumers
 # (psgc, blueprint_compiler, pulsar_game) never pull them in.
 [workspace]
-members = [".", "crates/graphy-blueprint"]
+members = [".", "crates/graphy-blueprint", "crates/graphy-reflection"]
 resolver = "2"
 
 [package]

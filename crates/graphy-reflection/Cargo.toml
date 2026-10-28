@@ -1,0 +1,13 @@
+[package]
+name = "graphy-reflection"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pulsar Team"]
+description = "Adapter from Pulsar runtime reflection to Graphy type resolution and node metadata"
+license = "MIT"
+
+# Headless: pulsar_reflection's default features are primitives, std and glam.
+# The gpui-backed `prims-gpui` feature is never enabled here.
+[dependencies]
+graphy = { path = "../.." }
+pulsar_reflection = { git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Reflection", rev = "f2acc6588f1b96f2ddbcf92a30f1c238d426deba" }

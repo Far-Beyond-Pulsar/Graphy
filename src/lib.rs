@@ -106,7 +106,8 @@ pub use core::{
 
 pub use contracts::{
     check_connection_types, check_invariants, ChainResolver, ChangeSet, Compatibility, EditError,
-    GraphChange, GraphCommand, IdAllocator, NodeId, PinRef, StructuralResolver, TypeResolver,
+    GraphChange, GraphCommand, IdAllocator, NodeId, PinRef, ScopedResolver, StructuralResolver,
+    TypeResolver,
 };
 
 pub use analysis::{DataResolver, DataSource, ExecutionRouting};

@@ -276,3 +276,31 @@ fn graph_description_serialization_preserves_ids_and_connection_order() {
     let back: GraphDescription = serde_json::from_str(&json).unwrap();
     assert_eq!(snapshot(&g), snapshot(&back));
 }
+
+#[test]
+fn scoped_resolver_confines_a_domain_and_blocks_cross_domain_connections() {
+    use graphy::ScopedResolver;
+    struct Same;
+    impl TypeResolver for Same {
+        fn compatibility(&self, a: &DataType, b: &DataType) -> Compatibility {
+            if a == b {
+                Compatibility::Exact
+            } else {
+                Compatibility::Incompatible("different".into())
+            }
+        }
+    }
+    let r = ScopedResolver::new("wgsl", Same);
+    let t = |s: &str| DataType::typed(s);
+    assert_eq!(r.compatibility(&t("wgsl::f32"), &t("wgsl::f32")), Compatibility::Exact);
+    assert!(matches!(
+        r.compatibility(&t("wgsl::f32"), &t("wgsl::vec3f")),
+        Compatibility::Incompatible(_)
+    ));
+    assert!(matches!(
+        r.compatibility(&t("wgsl::f32"), &t("f32")),
+        Compatibility::Incompatible(_)
+    ));
+    assert_eq!(r.compatibility(&t("f32"), &t("f64")), Compatibility::Unknown);
+    assert_eq!(r.compatibility(&DataType::Exec, &DataType::Exec), Compatibility::Unknown);
+}

@@ -140,3 +140,48 @@ pub fn check_connection_types(
     }
     out
 }
+
+/// Confines a domain resolver to types spelled `<scope>::<type>`.
+///
+/// This keeps type universes distinct when several domains share a graph
+/// host: a WGSL `wgsl::f32` never silently connects to a reflected Rust
+/// `f32`. If both types carry the scope, the prefix is stripped and `inner`
+/// decides; if exactly one does, the connection is [`Compatibility::Incompatible`];
+/// if neither does, the answer is [`Compatibility::Unknown`] so other
+/// resolvers in a [`ChainResolver`] can answer.
+pub struct ScopedResolver<R> {
+    scope: String,
+    inner: R,
+}
+
+impl<R: TypeResolver> ScopedResolver<R> {
+    pub fn new(scope: impl Into<String>, inner: R) -> Self {
+        Self {
+            scope: scope.into(),
+            inner,
+        }
+    }
+
+    fn strip(&self, ty: &DataType) -> Option<DataType> {
+        let DataType::Data(info) = ty else {
+            return None;
+        };
+        let rest = info.type_string.strip_prefix(&self.scope)?.strip_prefix("::")?;
+        let mut stripped = info.clone();
+        stripped.type_string = rest.to_string();
+        Some(DataType::Data(stripped))
+    }
+}
+
+impl<R: TypeResolver> TypeResolver for ScopedResolver<R> {
+    fn compatibility(&self, from: &DataType, to: &DataType) -> Compatibility {
+        match (self.strip(from), self.strip(to)) {
+            (Some(a), Some(b)) => self.inner.compatibility(&a, &b),
+            (Some(_), None) | (None, Some(_)) => Compatibility::Incompatible(format!(
+                "'{}' types do not connect to types outside that domain",
+                self.scope
+            )),
+            (None, None) => Compatibility::Unknown,
+        }
+    }
+}

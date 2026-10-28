@@ -32,5 +32,6 @@ pub use commands::{ChangeSet, EditError, GraphChange, GraphCommand};
 pub use ids::{IdAllocator, NodeId, PinRef};
 pub use invariants::check_invariants;
 pub use resolver::{
-    check_connection_types, ChainResolver, Compatibility, StructuralResolver, TypeResolver,
+    check_connection_types, ChainResolver, Compatibility, ScopedResolver, StructuralResolver,
+    TypeResolver,
 };
