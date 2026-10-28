@@ -279,6 +279,16 @@ impl GraphCommand {
     }
 }
 
+/// Whether `c` could be connected, treating an occupied input (or occupied
+/// execution output) as replaceable. Editors use it for drop-target feedback;
+/// the replacing edit itself is a `Disconnect` followed by `Connect`.
+pub fn can_connect_replacing(graph: &GraphDescription, c: &Connection) -> Result<(), EditError> {
+    match check_connect(graph, c) {
+        Err(EditError::InputOccupied(_)) | Err(EditError::ExecOutputOccupied(_)) => Ok(()),
+        other => other,
+    }
+}
+
 fn check_connect(graph: &GraphDescription, c: &Connection) -> Result<(), EditError> {
     let src = graph
         .nodes

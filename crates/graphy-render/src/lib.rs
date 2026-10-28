@@ -44,7 +44,7 @@ pub use layout::{
 };
 pub use presenter::{
     category_accent, default_pin_style, prettify, CommentPresentation, DefaultPresenter,
-    NodePresentation, PinShape, PinStyle, Presenter, WireStyle,
+    NodePresentation, PinShape, PinStyle, PinWidget, Presenter, WireStyle,
 };
 pub use scene::{PinInfo, Scene, SceneComment, SceneNode, SceneWire};
 pub use style::{Theme, WireWeights};

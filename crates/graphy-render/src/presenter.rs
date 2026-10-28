@@ -89,6 +89,14 @@ pub struct WireStyle {
     pub exec: bool,
 }
 
+/// A small read-only value chip drawn after an unconnected input pin's label
+/// (the pin's default value). Clicking it asks the host to edit the value.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PinWidget {
+    pub text: String,
+    pub width: f32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CommentPresentation {
     pub accent: Color,
@@ -114,6 +122,16 @@ pub trait Presenter {
     }
 
     /// Height of a pin row; override for variable-height rows.
+    /// Inline value chip for an unconnected input pin (default values).
+    fn pin_widget(
+        &self,
+        _node: &NodeInstance,
+        _pin: &PinInstance,
+        _side: PinSide,
+    ) -> Option<PinWidget> {
+        None
+    }
+
     fn row_height(&self, _node: &NodeInstance, _row: &RowContent, metrics: &LayoutMetrics) -> f32 {
         metrics.row_h
     }

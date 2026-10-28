@@ -25,7 +25,12 @@ pub enum NodePart {
 pub enum Hit {
     None,
     Pin(PinAddr),
-    Node { node: usize, part: NodePart },
+    Node {
+        node: usize,
+        part: NodePart,
+    },
+    /// The inline value chip of an unconnected input pin.
+    PinWidget(PinAddr),
     Wire(usize),
     CommentHeader(usize),
     CommentResize(usize),
@@ -75,6 +80,40 @@ impl Scene {
             }
         }
         best.map(|(_, a)| a)
+    }
+
+    /// Graph-space rectangle of an input pin's inline chip, if it has one.
+    pub fn widget_rect(&self, node: usize, pin: usize) -> Option<Rect> {
+        let n = self.nodes.get(node)?;
+        let info = n.inputs.get(pin)?;
+        let w = info.widget.as_ref()?;
+        let c = n.pin_pos(PinSide::Input, pin)?;
+        let x = c.x
+            + self.metrics.pin_size * 0.5
+            + self.metrics.label_gap
+            + info.label_width
+            + crate::scene::WIDGET_GAP;
+        Some(Rect::from_pos_size(
+            Vec2::new(x, c.y - crate::scene::WIDGET_HEIGHT * 0.5),
+            Vec2::new(w.width, crate::scene::WIDGET_HEIGHT),
+        ))
+    }
+
+    pub fn widget_at(&self, p: Vec2) -> Option<PinAddr> {
+        for ni in self.spatial.nodes.query(Rect::around(p, 0.5), true) {
+            for (pi, info) in self.nodes[ni].inputs.iter().enumerate() {
+                if info.widget.is_some() && !info.connected {
+                    if self.widget_rect(ni, pi).is_some_and(|r| r.contains(p)) {
+                        return Some(PinAddr {
+                            node: ni,
+                            side: PinSide::Input,
+                            pin: pi,
+                        });
+                    }
+                }
+            }
+        }
+        None
     }
 
     pub fn node_at(&self, p: Vec2) -> Option<(usize, NodePart)> {
@@ -135,6 +174,9 @@ impl Scene {
     pub fn hit_test(&self, p: Vec2, zoom: f32, tol: HitTolerance) -> Hit {
         if let Some(a) = self.pin_at(p, zoom, tol) {
             return Hit::Pin(a);
+        }
+        if let Some(a) = self.widget_at(p) {
+            return Hit::PinWidget(a);
         }
         if let Some((node, part)) = self.node_at(p) {
             return Hit::Node { node, part };

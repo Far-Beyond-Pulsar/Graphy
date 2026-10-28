@@ -105,7 +105,7 @@ pub use core::{
 };
 
 pub use contracts::{
-    check_connection_types, check_invariants, ChainResolver, ChangeSet, Compatibility, EditError,
+    can_connect_replacing, check_connection_types, check_invariants, ChainResolver, ChangeSet, Compatibility, EditError,
     GraphChange, GraphCommand, IdAllocator, NodeId, PinRef, ScopedResolver, StructuralResolver,
     TypeResolver,
 };

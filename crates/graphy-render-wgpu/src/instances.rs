@@ -21,7 +21,7 @@ pub struct Uniforms {
 }
 
 impl Uniforms {
-    pub fn new(d: &DrawData, scale: f32, target: (u32, u32)) -> Self {
+    pub fn new(d: &DrawData, scale: f32, target: (u32, u32), srgb: bool) -> Self {
         Self {
             viewport: [target.0 as f32, target.1 as f32],
             pan: [d.view.pan.x, d.view.pan.y],
@@ -29,11 +29,11 @@ impl Uniforms {
             scale,
             time: d.time,
             _pad: 0.0,
-            canvas: d.canvas.background,
-            grid_minor: d.canvas.grid_minor,
-            grid_major: d.canvas.grid_major,
+            canvas: tone(d.canvas.background, srgb),
+            grid_minor: tone(d.canvas.grid_minor, srgb),
+            grid_major: tone(d.canvas.grid_major, srgb),
             grid_params: [d.canvas.minor_step, d.canvas.major_every, 0.0, 0.0],
-            card_body: d.canvas.card_body,
+            card_body: tone(d.canvas.card_body, srgb),
         }
     }
 }
@@ -54,16 +54,16 @@ pub struct BoxInstance {
     pub kind: u32,
 }
 
-impl From<&BoxDraw> for BoxInstance {
-    fn from(b: &BoxDraw) -> Self {
+impl BoxInstance {
+    pub fn new(b: &BoxDraw, srgb: bool) -> Self {
         Self {
             pos: [b.rect.min.x, b.rect.min.y],
             size: [b.rect.width(), b.rect.height()],
-            body: b.body,
-            header: b.header,
-            accent: b.accent,
-            border: b.border,
-            ring: b.ring,
+            body: tone(b.body, srgb),
+            header: tone(b.header, srgb),
+            accent: tone(b.accent, srgb),
+            border: tone(b.border, srgb),
+            ring: tone(b.ring, srgb),
             header_h: b.header_h,
             radius: b.radius,
             flags: b.flags,
@@ -83,13 +83,13 @@ pub struct PinInstance {
     pub input: u32,
 }
 
-impl From<&PinDraw> for PinInstance {
-    fn from(p: &PinDraw) -> Self {
+impl PinInstance {
+    pub fn new(p: &PinDraw, srgb: bool) -> Self {
         Self {
             center: [p.center.x, p.center.y],
             size: p.size,
             flags: p.flags,
-            color: p.color,
+            color: tone(p.color, srgb),
             shape: p.shape.shader_kind(),
             input: p.input as u32,
         }
@@ -109,8 +109,8 @@ pub struct WireInstance {
     pub fparams: [f32; 4],
 }
 
-impl From<&WireDraw> for WireInstance {
-    fn from(w: &WireDraw) -> Self {
+impl WireInstance {
+    pub fn new(w: &WireDraw, srgb: bool) -> Self {
         let p = &w.shape.pts;
         let mode = match w.shape.routing {
             WireRouting::Bezier => 0,
@@ -120,7 +120,7 @@ impl From<&WireDraw> for WireInstance {
             p01: [p[0].x, p[0].y, p[1].x, p[1].y],
             p23: [p[2].x, p[2].y, p[3].x, p[3].y],
             p45: [p[4].x, p[4].y, p[5].x, p[5].y],
-            color: w.color,
+            color: tone(w.color, srgb),
             params: [mode, w.shape.n as u32, w.segments, w.flags],
             fparams: [w.width, w.phase, 0.0, 0.0],
         }
@@ -136,4 +136,21 @@ pub struct TextVertex {
     pub pos: [f32; 2],
     pub uv: [f32; 2],
     pub color: [f32; 4],
+}
+
+/// Colours are authored in display (sRGB) space. A `*Srgb` target encodes the
+/// shader's output, so authored values must be linearised first for the result
+/// to match; a plain `Unorm` target takes them as they are.
+pub fn tone(c: [f32; 4], srgb: bool) -> [f32; 4] {
+    if !srgb {
+        return c;
+    }
+    let f = |v: f32| {
+        if v <= 0.04045 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    [f(c[0]), f(c[1]), f(c[2]), c[3]]
 }

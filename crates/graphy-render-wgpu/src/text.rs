@@ -209,12 +209,13 @@ impl TextEngine {
         texts: &[TextDraw],
         view: &ViewTransform,
         scale: f32,
+        srgb: bool,
         out: &mut Vec<TextVertex>,
     ) {
         for attempt in 0..2 {
             out.clear();
             for t in texts {
-                self.layout_one(t, view, scale, out);
+                self.layout_one(t, view, scale, srgb, out);
             }
             if !self.full || attempt == 1 {
                 break;
@@ -228,6 +229,7 @@ impl TextEngine {
         t: &TextDraw,
         view: &ViewTransform,
         scale: f32,
+        srgb: bool,
         out: &mut Vec<TextVertex>,
     ) {
         let px = t.size * view.zoom * scale;
@@ -253,7 +255,7 @@ impl TextEngine {
                 let left = (pen + g.xmin).round();
                 let top = baseline - g.ymin - g.h;
                 let (l, r, tp, b) = (left, left + g.w, top, top + g.h);
-                let c = t.color;
+                let c = crate::instances::tone(t.color, srgb);
                 let v = |x: f32, y: f32, u: f32, w: f32| TextVertex {
                     pos: [x, y],
                     uv: [u, w],

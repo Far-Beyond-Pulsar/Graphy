@@ -28,7 +28,7 @@ pub mod ids;
 pub mod invariants;
 pub mod resolver;
 
-pub use commands::{ChangeSet, EditError, GraphChange, GraphCommand};
+pub use commands::{can_connect_replacing, ChangeSet, EditError, GraphChange, GraphCommand};
 pub use ids::{IdAllocator, NodeId, PinRef};
 pub use invariants::check_invariants;
 pub use resolver::{

@@ -22,6 +22,10 @@ use crate::wire::WireShape;
 /// card without bound.
 pub const MAX_LABEL_WIDTH: f32 = 150.0;
 pub const MAX_TITLE_WIDTH: f32 = 220.0;
+/// Gap between a pin label and its inline widget chip.
+pub const WIDGET_GAP: f32 = 6.0;
+/// Chip height, graph units.
+pub const WIDGET_HEIGHT: f32 = 15.0;
 
 #[derive(Clone, Debug)]
 pub struct PinInfo {
@@ -29,6 +33,10 @@ pub struct PinInfo {
     pub label: String,
     pub style: PinStyle,
     pub connected: bool,
+    /// Inline value chip shown after the label while the input is unconnected.
+    pub widget: Option<crate::presenter::PinWidget>,
+    /// Measured label width (capped), graph units.
+    pub label_width: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -446,13 +454,22 @@ fn build_node(
                 label: presenter.pin_label(node, p, side),
                 style: presenter.pin(node, p, side),
                 connected: false,
+                widget: if side == PinSide::Input {
+                    presenter.pin_widget(node, p, side)
+                } else {
+                    None
+                },
+                label_width: measure
+                    .width(&presenter.pin_label(node, p, side), m.label_font)
+                    .min(MAX_LABEL_WIDTH),
             })
             .collect()
     };
     let inputs = pin_info(&node.inputs, PinSide::Input);
     let outputs = pin_info(&node.outputs, PinSide::Output);
 
-    let label_w = |p: &PinInfo| measure.width(&p.label, m.label_font).min(MAX_LABEL_WIDTH);
+    let label_w =
+        |p: &PinInfo| p.label_width + p.widget.as_ref().map_or(0.0, |w| WIDGET_GAP + w.width);
     let header_output = presentation.header_output.filter(|h| *h < outputs.len());
     let (rows, extra_min) = NodeSpec::build_rows(
         inputs.len(),

@@ -119,6 +119,7 @@ pub struct GraphRenderer {
     wire_buf: Grow,
     text_buf: Grow,
     text: TextEngine,
+    srgb: bool,
     ranges: Ranges,
     // scratch reused across frames
     box_scratch: Vec<BoxInstance>,
@@ -319,6 +320,7 @@ impl GraphRenderer {
             wire_buf: Grow::new(device, "graphy_wires", vb),
             text_buf: Grow::new(device, "graphy_text_verts", vb),
             text,
+            srgb: format.is_srgb(),
             ranges: Ranges::default(),
             box_scratch: Vec::new(),
             wire_scratch: Vec::new(),
@@ -345,14 +347,15 @@ impl GraphRenderer {
         queue.write_buffer(
             &self.uniform_buf,
             0,
-            bytemuck::bytes_of(&Uniforms::new(d, scale, target)),
+            bytemuck::bytes_of(&Uniforms::new(d, scale, target, self.srgb)),
         );
 
+        let srgb = self.srgb;
         // boxes: comments | nodes | overlays
         self.box_scratch.clear();
         let mark = |src: &[graphy_render::BoxDraw], s: &mut Vec<BoxInstance>| {
             let a = s.len() as u32;
-            s.extend(src.iter().map(BoxInstance::from));
+            s.extend(src.iter().map(|b| BoxInstance::new(b, srgb)));
             (a, s.len() as u32)
         };
         self.ranges.comments = mark(&d.comments, &mut self.box_scratch);
@@ -361,7 +364,7 @@ impl GraphRenderer {
         self.box_buf
             .write(device, queue, bytemuck::cast_slice(&self.box_scratch));
 
-        let pins: Vec<PinInstance> = d.pins.iter().map(PinInstance::from).collect();
+        let pins: Vec<PinInstance> = d.pins.iter().map(|p| PinInstance::new(p, srgb)).collect();
         self.ranges.pins = pins.len() as u32;
         self.pin_buf
             .write(device, queue, bytemuck::cast_slice(&pins));
@@ -369,7 +372,7 @@ impl GraphRenderer {
         // wires: scene | tails | overlay
         self.wire_scratch.clear();
         self.wire_scratch
-            .extend(d.wires.iter().map(WireInstance::from));
+            .extend(d.wires.iter().map(|w| WireInstance::new(w, srgb)));
         self.ranges.wires = self.wire_scratch.len() as u32;
         self.ranges.halo_from = d
             .wires
@@ -378,17 +381,17 @@ impl GraphRenderer {
             .unwrap_or(d.wires.len()) as u32;
         let t0 = self.wire_scratch.len() as u32;
         self.wire_scratch
-            .extend(d.tails.iter().map(WireInstance::from));
+            .extend(d.tails.iter().map(|w| WireInstance::new(w, srgb)));
         self.ranges.tails = (t0, self.wire_scratch.len() as u32);
         let o0 = self.wire_scratch.len() as u32;
         self.wire_scratch
-            .extend(d.overlay_wires.iter().map(WireInstance::from));
+            .extend(d.overlay_wires.iter().map(|w| WireInstance::new(w, srgb)));
         self.ranges.overlay_wires = (o0, self.wire_scratch.len() as u32);
         self.wire_buf
             .write(device, queue, bytemuck::cast_slice(&self.wire_scratch));
 
         self.text
-            .layout(&d.texts, &d.view, scale, &mut self.text_scratch);
+            .layout(&d.texts, &d.view, scale, self.srgb, &mut self.text_scratch);
         self.ranges.text_verts = self.text_scratch.len() as u32;
         self.text.upload(device, queue);
         self.text_buf

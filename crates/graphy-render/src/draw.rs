@@ -190,6 +190,8 @@ pub struct InteractionState {
     pub selected_comments: HashSet<usize>,
     pub selected_wires: HashSet<usize>,
     pub focused_node: Option<String>,
+    /// Connections (by document index) not drawn, e.g. a wire picked up for re-routing.
+    pub hidden_connections: HashSet<usize>,
     pub dragging_nodes: HashSet<String>,
     pub marquee: Option<Rect>,
     pub guides: Vec<Rect>,
@@ -329,6 +331,9 @@ impl Scene {
         let (mut dim, mut normal, mut emph) = (Vec::new(), Vec::new(), Vec::new());
         for wi in candidates {
             let w = &self.wires[wi];
+            if st.hidden_connections.contains(&w.connection) {
+                continue;
+            }
             let touches_focus =
                 focus_nodes.contains(&w.from_node) || focus_nodes.contains(&w.to_node);
             let picked = hovered_wire == Some(wi) || st.selected_wires.contains(&w.connection);
@@ -615,6 +620,36 @@ impl Scene {
                             .min(crate::scene::MAX_LABEL_WIDTH)
                     };
                     if let Some(i) = input {
+                        if let (Some(w), false) = (&node.inputs[i].widget, node.inputs[i].connected)
+                        {
+                            if let Some(chip) = self.widget_rect(ni, i) {
+                                out.nodes.push(BoxDraw {
+                                    rect: chip,
+                                    kind: BoxKind::Well,
+                                    body: theme.preview_well,
+                                    header: [0.0; 4],
+                                    accent: pres.accent,
+                                    border: theme.card_border,
+                                    ring: [0.0; 4],
+                                    header_h: 0.0,
+                                    radius: 3.0,
+                                    flags: f & flags::DISABLED,
+                                });
+                                out.texts.push(TextDraw {
+                                    text: fit_text(
+                                        measure,
+                                        &w.text,
+                                        m.label_font - 1.0,
+                                        w.width - 8.0,
+                                    ),
+                                    pos: Vec2::new(chip.min.x + 4.0, chip.center().y),
+                                    size: m.label_font - 1.0,
+                                    color: text_color(theme.text_faint),
+                                    align: TextAlign::Left,
+                                    bold: false,
+                                });
+                            }
+                        }
                         let label = &node.inputs[i].label;
                         let max_w = rr.width()
                             - edge
