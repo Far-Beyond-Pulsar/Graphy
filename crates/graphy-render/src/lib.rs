@@ -47,7 +47,7 @@ pub use presenter::{
     NodePresentation, PinShape, PinStyle, PinWidget, Presenter, WireStyle,
 };
 pub use scene::{PinInfo, Scene, SceneComment, SceneNode, SceneWire};
-pub use style::{Theme, WireWeights};
+pub use style::{contrast_ratio, relative_luminance, Theme, ThemeColors, WireWeights};
 pub use text::{fit_text, FixedAdvance, TextMeasure};
 pub use view::{LodTier, ViewTransform, MAX_ZOOM, MIN_ZOOM};
 pub use wire::{WireRouting, WireShape};
