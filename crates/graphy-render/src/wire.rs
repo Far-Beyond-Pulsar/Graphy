@@ -13,17 +13,20 @@ pub enum WireRouting {
     Angular,
 }
 
-/// Points evaluated per rounded corner (inclusive of both ends).
-pub const CORNER_STEPS: usize = 7;
-/// Corner radius of angular wires, graph units.
-pub const ANGULAR_RADIUS: f32 = 12.0;
-const STUB: f32 = 26.0;
+    /// Points evaluated per rounded corner (inclusive of both ends).
+    pub const CORNER_STEPS: usize = 7;
+    /// Corner radius of angular wires, graph units.
+    pub const ANGULAR_RADIUS: f32 = 12.0;
+    const STUB: f32 = 26.0;
 
-/// Up to six waypoints. Bezier uses `pts[0..4]` as the cubic's control
-/// polygon; angular uses `pts[0..n]` as a polyline whose interior vertices are
-/// rounded.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct WireShape {
+    /// Up to six waypoints. Bezier uses `pts[0..4]` as the cubic's control
+    /// polygon; angular uses `pts[0..n]` as a polyline whose interior vertices are
+    /// rounded. A five-waypoint bezier is a wire that passes through the
+    /// point `pts[2]` (a zip tie slot), evaluated as two cubic halves
+    /// `(pts[0], pts[1], pts[2], pts[2])` and `(pts[2], pts[2], pts[3], pts[4])`
+    /// that meet there; the wire shader runs the same algorithm.
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct WireShape {
     pub routing: WireRouting,
     pub n: usize,
     pub pts: [Vec2; 6],
@@ -65,6 +68,42 @@ impl WireShape {
         WireShape {
             routing: WireRouting::Bezier,
             n: 4,
+            pts,
+        }
+    }
+
+    /// Bezier wire from `from` to `to` forced through `q`: ties and clamps.
+    /// Two degenerate-halves cubics share `q`, so the curve is exact there and
+    /// both endpoint tangents stay horizontal.
+    pub fn through(from: Vec2, q: Vec2, to: Vec2) -> WireShape {
+        let dx = to.x - from.x;
+        let handle = if dx >= 0.0 {
+            (dx * 0.35).max(30.0)
+        } else {
+            30.0 + (-dx) * 0.4
+        };
+        let mut pts = [Vec2::ZERO; 6];
+        pts[..5].copy_from_slice(&[
+            from,
+            Vec2::new(from.x + handle, from.y),
+            q,
+            Vec2::new(to.x - handle, to.y),
+            to,
+        ]);
+        WireShape {
+            routing: WireRouting::Bezier,
+            n: 5,
+            pts,
+        }
+    }
+
+    /// Angular wire from `from` to `to` passing `q` as an interior vertex.
+    pub fn through_angular(from: Vec2, q: Vec2, to: Vec2) -> WireShape {
+        let mut pts = [Vec2::ZERO; 6];
+        pts[..3].copy_from_slice(&[from, q, to]);
+        WireShape {
+            routing: WireRouting::Angular,
+            n: 3,
             pts,
         }
     }
@@ -123,6 +162,19 @@ impl WireShape {
     /// rounded polyline (angular; `segments` is ignored there).
     pub fn flatten(&self, segments: u32) -> Vec<Vec2> {
         match self.routing {
+            WireRouting::Bezier if self.n == 5 => {
+                // two halves meeting at pts[2], `t <= 0.5` on the first
+                let h = ((segments / 2) as usize).max(1);
+                let r = ((segments - h as u32) as usize).max(1);
+                let first =
+                    |k: usize| cubic(self.pts[0], self.pts[1], self.pts[2], self.pts[2], k as f32 / h as f32);
+                let second =
+                    |k: usize| cubic(self.pts[2], self.pts[2], self.pts[3], self.pts[4], k as f32 / r as f32);
+                let mut out = Vec::with_capacity(segments as usize + 1);
+                (0..=h).for_each(|k| out.push(first(k)));
+                (1..=r).for_each(|k| out.push(second(k)));
+                out
+            }
             WireRouting::Bezier => {
                 let [p0, p1, p2, p3] = [self.pts[0], self.pts[1], self.pts[2], self.pts[3]];
                 (0..=segments)

@@ -103,7 +103,7 @@ pub struct WireInstance {
     pub p23: [f32; 4],
     pub p45: [f32; 4],
     pub color: [f32; 4],
-    /// mode (0 bezier, 1 angular), waypoint count, segments, flags
+    /// mode (0 bezier, 1 angular polyline, 2 bezier through-point), waypoint count, segments, flags
     pub params: [u32; 4],
     /// width (graph units), phase
     pub fparams: [f32; 4],
@@ -113,6 +113,7 @@ impl WireInstance {
     pub fn new(w: &WireDraw, srgb: bool) -> Self {
         let p = &w.shape.pts;
         let mode = match w.shape.routing {
+            WireRouting::Bezier if w.shape.n == 5 => 2,
             WireRouting::Bezier => 0,
             WireRouting::Angular => 1,
         };

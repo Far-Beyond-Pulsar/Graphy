@@ -1,6 +1,7 @@
 // Wires. Each instance is one connection described by up to six waypoints; the
-// vertex stage evaluates the curve (cubic bezier, or a rounded orthogonal
-// route) into up to MAX_SEGS capsule segments, so there is no CPU
+// vertex stage evaluates the curve (cubic bezier, a rounded orthogonal route,
+// or a five-waypoint bezier forced through its middle waypoint — the zip tie
+// slot) into up to MAX_SEGS capsule segments, so there is no CPU
 // tessellation. Every segment is a quad whose fragments compute an exact
 // capsule distance, which makes joins round and gives uniform antialiasing at
 // any width. Resting wires are drawn opaque (already blended toward the canvas
@@ -78,7 +79,25 @@ fn route_point(i: Inst, k: u32) -> vec2<f32> {
     return mix(mix(a, corner, t), mix(corner, b, t), t);
 }
 
+// Mirrors WireShape::flatten's five-waypoint branch: two cubic halves that
+// share the duplicated waypoint pts[2] (the zip tie pass point) as a control,
+// meeting there with a shared tangent.
+fn through_point(i: Inst, k: u32) -> vec2<f32> {
+    let total = max(i.params.z, 1u);
+    let h = max(total / 2u, 1u);
+    let r = max(total - h, 1u);
+    if k <= h {
+        let t = f32(k) / f32(h);
+        return cubic(waypoint(i, 0u), waypoint(i, 1u), waypoint(i, 2u), waypoint(i, 2u), t);
+    }
+    let t = f32(k - h) / f32(r);
+    return cubic(waypoint(i, 2u), waypoint(i, 2u), waypoint(i, 3u), waypoint(i, 4u), t);
+}
+
 fn curve_point(i: Inst, k: u32) -> vec2<f32> {
+    if i.params.x == 2u {
+        return through_point(i, k);
+    }
     if i.params.x == 0u {
         let t = f32(k) / f32(max(i.params.z, 1u));
         return cubic(waypoint(i, 0u), waypoint(i, 1u), waypoint(i, 2u), waypoint(i, 3u), t);
@@ -87,10 +106,10 @@ fn curve_point(i: Inst, k: u32) -> vec2<f32> {
 }
 
 fn segment_count(i: Inst) -> u32 {
-    if i.params.x == 0u {
-        return min(i.params.z, MAX_SEGS);
+    if i.params.x == 1u {
+        return 1u + (i.params.y - 2u) * CORNER_STEPS;
     }
-    return 1u + (i.params.y - 2u) * CORNER_STEPS;
+    return min(i.params.z, MAX_SEGS);
 }
 
 fn build(i: Inst, vi: u32, halo: bool) -> VOut {
@@ -196,6 +215,9 @@ fn fs_main(in: VOut) -> @location(0) vec4<f32> {
     if flag(in.flags, F_PREVIEW) {
         let wave = 0.72 + 0.28 * sin(t * 40.0 - u.time * 7.0);
         alpha = alpha * wave;
+    }
+    if flag(in.flags, F_DASHED) {
+        alpha = alpha * mix(0.30, 1.0, smoothstep(-0.25, 0.25, sin(t * 22.0)));
     }
     if flag(in.flags, F_EMPHASIS) {
         col = mix(col, vec3<f32>(1.0), 0.06);

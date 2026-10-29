@@ -102,8 +102,10 @@ pub fn check_invariants(graph: &GraphDescription) -> Vec<Diagnostic> {
             );
         }
 
-        let (Some(src), Some(dst)) = (graph.nodes.get(&c.source_node), graph.nodes.get(&c.target_node))
-        else {
+        let (Some(src), Some(dst)) = (
+            graph.nodes.get(&c.source_node),
+            graph.nodes.get(&c.target_node),
+        ) else {
             for (id, present) in [
                 (&c.source_node, graph.nodes.contains_key(&c.source_node)),
                 (&c.target_node, graph.nodes.contains_key(&c.target_node)),
@@ -152,7 +154,8 @@ pub fn check_invariants(graph: &GraphDescription) -> Vec<Diagnostic> {
         };
 
         let exec_conn = c.connection_type == ConnectionType::Execution;
-        if from.data_type().is_execution() != exec_conn || to.data_type().is_execution() != exec_conn
+        if from.data_type().is_execution() != exec_conn
+            || to.data_type().is_execution() != exec_conn
         {
             out.push(
                 err(
@@ -169,7 +172,10 @@ pub fn check_invariants(graph: &GraphDescription) -> Vec<Diagnostic> {
         if !exec_conn && !input_drivers.insert((c.target_node.as_str(), c.target_pin.as_str())) {
             out.push(
                 err(
-                    format!("input pin '{}' has more than one incoming data connection", c.target_pin),
+                    format!(
+                        "input pin '{}' has more than one incoming data connection",
+                        c.target_pin
+                    ),
                     codes::MULTIPLE_INPUT_DRIVERS,
                 )
                 .at_pin(c.target_node.clone(), c.target_pin.clone()),
@@ -178,7 +184,10 @@ pub fn check_invariants(graph: &GraphDescription) -> Vec<Diagnostic> {
         if exec_conn && !exec_sources.insert((c.source_node.as_str(), c.source_pin.as_str())) {
             out.push(
                 err(
-                    format!("execution output '{}' has more than one outgoing connection", c.source_pin),
+                    format!(
+                        "execution output '{}' has more than one outgoing connection",
+                        c.source_pin
+                    ),
                     codes::MULTIPLE_EXEC_OUTPUTS,
                 )
                 .at_pin(c.source_node.clone(), c.source_pin.clone()),

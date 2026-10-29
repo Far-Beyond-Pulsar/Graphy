@@ -738,10 +738,12 @@ impl GraphCanvas {
         let mut params = DrawParams::new(Vec2::new(lw, lh), self.controller.view);
         params.theme = self.theme.clone();
         params.time = self.started.elapsed().as_secs_f32();
+        let tie_animating = self.scene.tick_ties(1.0 / 60.0);
         let state = self.controller.interaction_state(&self.scene);
         let mut data = self.scene.build_draw_data(&params, &state, &self.measure);
         self.profile.decorate(&self.graph, &self.scene, &mut data);
-        let animating = data.stats.nodes > 0
+        let animating = tie_animating
+            || data.stats.nodes > 0
             && self.scene.nodes.iter().any(|n| n.presentation.active)
             || self.controller.is_dragging() && state.connecting.is_some();
         if let Some(r) = self.renderer.as_mut() {

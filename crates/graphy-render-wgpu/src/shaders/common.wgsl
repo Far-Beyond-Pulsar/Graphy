@@ -69,3 +69,4 @@ const F_PREVIEW: u32 = 512u;
 const F_CONNECTED: u32 = 1024u;
 const F_COMPATIBLE: u32 = 2048u;
 const F_RINGED: u32 = 4096u;
+const F_DASHED: u32 = 8192u;

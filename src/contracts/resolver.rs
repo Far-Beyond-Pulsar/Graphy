@@ -5,9 +5,7 @@
 //! several with [`ChainResolver`] so that, for example, WGSL types stay
 //! distinct from reflected Rust types.
 
-use crate::{
-    ConnectionType, DataType, Diagnostic, GraphDescription, PassName, Severity,
-};
+use crate::{ConnectionType, DataType, Diagnostic, GraphDescription, PassName, Severity};
 
 use super::invariants::codes;
 
@@ -122,8 +120,7 @@ pub fn check_connection_types(
         let (Some(from), Some(to)) = (from, to) else {
             continue;
         };
-        let (severity, code, msg) = match resolver.compatibility(from.data_type(), to.data_type())
-        {
+        let (severity, code, msg) = match resolver.compatibility(from.data_type(), to.data_type()) {
             Compatibility::Incompatible(why) => (Severity::Error, codes::TYPE_MISMATCH, why),
             Compatibility::Unknown => (
                 Severity::Warning,
@@ -166,7 +163,10 @@ impl<R: TypeResolver> ScopedResolver<R> {
         let DataType::Data(info) = ty else {
             return None;
         };
-        let rest = info.type_string.strip_prefix(&self.scope)?.strip_prefix("::")?;
+        let rest = info
+            .type_string
+            .strip_prefix(&self.scope)?
+            .strip_prefix("::")?;
         let mut stripped = info.clone();
         stripped.type_string = rest.to_string();
         Some(DataType::Data(stripped))

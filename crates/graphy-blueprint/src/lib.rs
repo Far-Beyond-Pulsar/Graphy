@@ -216,6 +216,24 @@ pub struct GraphDescription {
     pub comments: Vec<BlueprintComment>,
     #[serde(default)]
     pub custom_event_defs: HashMap<String, CustomEventDefDescription>,
+    /// Visual wire clamps created in the shared graph canvas.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub zip_ties: Vec<BlueprintZipTie>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlueprintZipTie {
+    #[serde(with = "tuple_or_object_f32_pair")]
+    pub position: (f32, f32),
+    pub wires: Vec<BlueprintZipTieEdge>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlueprintZipTieEdge {
+    pub source_node: String,
+    pub source_pin: String,
+    pub target_node: String,
+    pub target_pin: String,
 }
 
 /// Comment box in a blueprint graph
@@ -553,6 +571,7 @@ impl GraphDescription {
             },
             comments: Vec::new(),
             custom_event_defs: HashMap::new(),
+            zip_ties: Vec::new(),
         }
     }
 

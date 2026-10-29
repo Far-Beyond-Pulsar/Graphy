@@ -16,7 +16,7 @@ use crate::layout::{LayoutMetrics, NodeLayout, NodeShape, NodeSpec, PinSide};
 use crate::presenter::{CommentPresentation, NodePresentation, PinStyle, Presenter, WireStyle};
 use crate::spatial::{Entry, SpatialIndex};
 use crate::text::TextMeasure;
-use crate::wire::WireShape;
+use crate::wire::{WireRouting, WireShape};
 
 /// Label widths are capped so a long name truncates instead of growing the
 /// card without bound.
@@ -26,6 +26,17 @@ pub const MAX_TITLE_WIDTH: f32 = 220.0;
 pub const WIDGET_GAP: f32 = 6.0;
 /// Chip height, graph units.
 pub const WIDGET_HEIGHT: f32 = 15.0;
+
+/// Distance between neighbouring wires through a zip tie slot, graph units.
+pub const TIE_SPACING: f32 = 14.0;
+/// How far the tie bar sticks out past the outermost slots.
+pub const TIE_MARGIN: f32 = 20.0;
+/// Seconds the add-wobble runs for.
+const TIE_WOBBLE_TIME: f32 = 0.6;
+/// Wobble amplitude start, graph units (quadratic falloff).
+const TIE_WOBBLE_AMP: f32 = 11.0;
+/// Wobble frequency, radians/second.
+const TIE_WOBBLE_FREQ: f32 = 18.0;
 
 #[derive(Clone, Debug)]
 pub struct PinInfo {
@@ -89,11 +100,61 @@ pub struct SceneWire {
     pub shape: WireShape,
 }
 
+/// A resolved zip tie: the wires it clamps and where the bundle runs.
+#[derive(Clone, Debug)]
+pub struct SceneTie {
+    /// Where the tie sits, graph units.
+    pub position: Vec2,
+    /// Unit direction the slots spread along (perpendicular to the flow).
+    pub axis: Vec2,
+    /// Wire indices, in slot order.
+    pub members: Vec<usize>,
+    /// Seconds of wobble left, and how long since it started.
+    pub wobble_left: f32,
+    pub wobble_t: f32,
+}
+
+impl SceneTie {
+    /// The two ends of the visible tie bar (and its hitbox centre line).
+    pub fn segment(&self) -> (Vec2, Vec2) {
+        let n = self.members.len() as f32;
+        let half = (n - 1.0).max(0.0) * 0.5 * TIE_SPACING + TIE_MARGIN;
+        (
+            self.position - self.axis * half,
+            self.position + self.axis * half,
+        )
+    }
+
+    /// Bounding box of the tie bar, for the spatial index.
+    pub fn rect(&self) -> crate::geom::Rect {
+        let (a, b) = self.segment();
+        crate::geom::Rect::from_corners(a, b)
+    }
+
+    /// Where member `slot_i` passes the tie, including any wobble.
+    pub fn pass_point(&self, slot_i: usize) -> Vec2 {
+        let n = self.members.len();
+        let slot = (slot_i as f32 - (n as f32 - 1.0) * 0.5) * TIE_SPACING;
+        let wob = if self.wobble_left > 0.0 {
+            let fade = (self.wobble_left / TIE_WOBBLE_TIME).clamp(0.0, 1.0);
+            TIE_WOBBLE_AMP
+                * fade
+                * fade
+                * (TIE_WOBBLE_FREQ * (TIE_WOBBLE_TIME - self.wobble_left) + slot_i as f32 * 0.9)
+                    .sin()
+        } else {
+            0.0
+        };
+        self.position + self.axis * (slot + wob)
+    }
+}
+
 pub struct Scene {
     pub metrics: LayoutMetrics,
     pub nodes: Vec<SceneNode>,
     pub comments: Vec<SceneComment>,
     pub wires: Vec<SceneWire>,
+    pub ties: Vec<SceneTie>,
     node_ix: HashMap<String, usize>,
     /// node index -> wires touching it
     adjacency: Vec<Vec<usize>>,
@@ -107,6 +168,7 @@ impl Scene {
             nodes: Vec::new(),
             comments: Vec::new(),
             wires: Vec::new(),
+            ties: Vec::new(),
             node_ix: HashMap::new(),
             adjacency: Vec::new(),
             spatial: SpatialIndex::default(),
@@ -237,6 +299,8 @@ impl Scene {
                 self.adjacency[w.to_node].push(wi);
             }
         }
+        self.ties.clear();
+        self.resolve_ties(graph);
         for wi in 0..self.wires.len() {
             self.reshape_wire(wi);
         }
@@ -248,6 +312,8 @@ impl Scene {
             }));
     }
 
+    /// Re-routes one wire: through its zip tie slot when it is in one, else
+    /// its plain shape. Returns the expanded bounds for the spatial index.
     fn reshape_wire(&mut self, wi: usize) -> Rect {
         let w = &self.wires[wi];
         let from = self.nodes[w.from_node]
@@ -256,10 +322,116 @@ impl Scene {
         let to = self.nodes[w.to_node]
             .pin_pos(PinSide::Input, w.to_pin)
             .unwrap_or_default();
-        let shape = WireShape::new(w.style.routing, from, to);
+        let shape = match self.tied_through(wi) {
+            Some(q) if w.style.routing == WireRouting::Angular => {
+                WireShape::through_angular(from, q, to)
+            }
+            Some(q) => WireShape::through(from, q, to),
+            None => WireShape::new(w.style.routing, from, to),
+        };
         let bounds = shape.bounds().expand(4.0);
         self.wires[wi].shape = shape;
         bounds
+    }
+
+    /// Where wire `wi` passes a zip tie clamp, if it is in one (wobble read
+    /// straight off the tie).
+    fn tied_through(&self, wi: usize) -> Option<Vec2> {
+        self.ties.iter().find_map(|t| {
+            t.members
+                .iter()
+                .position(|&m| m == wi)
+                .map(|i| t.pass_point(i))
+        })
+    }
+
+    /// Resolves the document's zip ties to live wire indices (stale edges are
+    /// dropped), routes members through their slots and rebuilds the tie
+    /// index. Empty ties stay as placeholders so scene indices always match
+    /// the document's.
+    fn resolve_ties(&mut self, graph: &GraphDescription) {
+        self.ties.clear();
+        for doc_tie in &graph.zip_ties {
+            let mut members: Vec<usize> = doc_tie
+                .wires
+                .iter()
+                .filter_map(|e| {
+                    self.wires.iter().position(|w| {
+                        graph
+                            .connections
+                            .get(w.connection)
+                            .is_some_and(|c| e.matches(c))
+                    })
+                })
+                .collect();
+            members.dedup();
+            // The bar runs perpendicular to the members' average flow.
+            let mut flow = Vec2::ZERO;
+            for &wi in &members {
+                let w = &self.wires[wi];
+                if let (Some(a), Some(b)) = (
+                    self.nodes[w.from_node].pin_pos(PinSide::Output, w.from_pin),
+                    self.nodes[w.to_node].pin_pos(PinSide::Input, w.to_pin),
+                ) {
+                    let d = b - a;
+                    if d.length() > 1e-6 {
+                        flow = flow + d * (1.0 / d.length());
+                    }
+                }
+            }
+            let mut axis = {
+                let a = Vec2::new(-flow.y, flow.x);
+                let len = a.length();
+                if len < 1e-6 {
+                    Vec2::new(0.0, 1.0)
+                } else {
+                    a * (1.0 / len)
+                }
+            };
+            let position = Vec2::new(doc_tie.position.x as f32, doc_tie.position.y as f32);
+            // Point the axis so the doc's member order ascends along it.
+            if members.len() >= 2 {
+                let proj = |t: &SceneTie, wi: usize| {
+                    let w = &self.wires[wi];
+                    let a = self.nodes[w.from_node]
+                        .pin_pos(PinSide::Output, w.from_pin)
+                        .unwrap_or_default();
+                    let b = self.nodes[w.to_node]
+                        .pin_pos(PinSide::Input, w.to_pin)
+                        .unwrap_or_default();
+                    let mid = (a + b) * 0.5 - t.position;
+                    mid.x * t.axis.x + mid.y * t.axis.y
+                };
+                let t = SceneTie {
+                    position,
+                    axis,
+                    members: members.clone(),
+                    wobble_left: 0.0,
+                    wobble_t: 0.0,
+                };
+                if proj(&t, members[0]) > proj(&t, members[members.len() - 1]) {
+                    axis = -axis;
+                }
+            }
+            self.ties.push(SceneTie {
+                position,
+                axis,
+                members,
+                wobble_left: 0.0,
+                wobble_t: 0.0,
+            });
+            // Route the members through their slots.
+            for slot in 0..self.ties[self.ties.len() - 1].members.len() {
+                let wi = self.ties[self.ties.len() - 1].members[slot];
+                self.reshape_wire(wi);
+            }
+        }
+        self.spatial
+            .ties
+            .rebuild(self.ties.iter().enumerate().map(|(i, t)| Entry {
+                index: i,
+                rect: t.rect().expand(6.0),
+            }));
     }
 
     // ------------------------------------------------------------ incremental
@@ -295,6 +467,73 @@ impl Scene {
         self.spatial.comments.update(old, rect);
     }
 
+    /// Moves a tie in the scene only (tie-drag preview) and re-routes its
+    /// members; callers commit a `MoveZipTie` change to make it stick.
+    pub fn set_zip_tie_position(&mut self, index: usize, pos: Vec2) {
+        let old = Entry {
+            index,
+            rect: self.ties[index].rect().expand(6.0),
+        };
+        self.ties[index].position = pos;
+        for &wi in self.ties[index].members.clone().iter() {
+            let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
+            let new_bounds = self.reshape_wire(wi);
+            self.spatial.wires.update(
+                Entry {
+                    index: wi,
+                    rect: old_bounds,
+                },
+                new_bounds,
+            );
+        }
+        self.spatial
+            .ties
+            .update(old, self.ties[index].rect().expand(6.0));
+    }
+
+    /// Starts the add-wobble on a tie.
+    pub fn start_tie_wobble(&mut self, index: usize) {
+        if self.ties.get(index).map_or(true, |t| t.members.is_empty()) {
+            return;
+        }
+        let tie = &mut self.ties[index];
+        tie.wobble_left = TIE_WOBBLE_TIME;
+        tie.wobble_t = 0.0;
+    }
+
+    /// Advances tie wobbles; returns true while anything is still moving.
+    pub fn tick_ties(&mut self, dt: f32) -> bool {
+        if dt <= 0.0 {
+            return false;
+        }
+        let mut active = false;
+        for i in 0..self.ties.len() {
+            if self.ties[i].wobble_left > 0.0 {
+                active = true;
+                self.ties[i].wobble_left = (self.ties[i].wobble_left - dt).max(0.0);
+                self.ties[i].wobble_t += dt;
+                self.reshuffle_tie(i);
+            }
+        }
+        active
+    }
+
+    /// Re-routes one tie's members (wobble animation / drag) and refreshes
+    /// the wire index entries.
+    fn reshuffle_tie(&mut self, ti: usize) {
+        for &wi in self.ties[ti].members.clone().iter() {
+            let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
+            let new_bounds = self.reshape_wire(wi);
+            self.spatial.wires.update(
+                Entry {
+                    index: wi,
+                    rect: old_bounds,
+                },
+                new_bounds,
+            );
+        }
+    }
+
     /// Brings the scene in line with the edits in `changes`. Node moves are
     /// applied in place; structural changes relayout the touched nodes and
     /// re-resolve wires; adding or removing a node rebuilds (indices shift).
@@ -316,6 +555,7 @@ impl Scene {
             return;
         }
         let mut wires_dirty = false;
+        let mut wobble_tie: Option<usize> = None;
         for change in &changes.changes {
             match change {
                 GraphChange::NodeMoved { id, to, .. } => {
@@ -340,6 +580,13 @@ impl Scene {
                 GraphChange::ConnectionAdded(_) | GraphChange::ConnectionRemoved(_) => {
                     wires_dirty = true
                 }
+                GraphChange::ZipTieAdded { index, .. } => {
+                    wires_dirty = true;
+                    wobble_tie = Some(*index);
+                }
+                GraphChange::ZipTieMoved { .. } | GraphChange::ZipTieRemoved { .. } => {
+                    wires_dirty = true
+                }
                 GraphChange::PropertySet { node, .. } => {
                     self.refresh_node(graph, node, presenter, measure)
                 }
@@ -352,6 +599,9 @@ impl Scene {
         }
         if wires_dirty {
             self.rebuild_wires(graph, presenter);
+        }
+        if let Some(i) = wobble_tie {
+            self.start_tie_wobble(i);
         }
     }
 
@@ -450,8 +700,10 @@ fn is_incremental(c: &GraphChange) -> bool {
             | GraphChange::ConnectionRemoved(_)
             | GraphChange::PropertySet { .. }
             | GraphChange::PinsReplaced { .. }
-    )
-}
+            | GraphChange::ZipTieAdded { .. }
+            | GraphChange::ZipTieMoved { .. }
+            | GraphChange::ZipTieRemoved { .. },
+    )}
 
 fn build_node(
     node: &graphy::NodeInstance,

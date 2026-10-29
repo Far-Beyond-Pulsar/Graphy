@@ -66,11 +66,16 @@ pub struct Selection {
     pub comments: BTreeSet<usize>,
     /// Connections, by index into the document's connection list.
     pub wires: BTreeSet<usize>,
+    /// Zip ties, by index into the document's tie list.
+    pub ties: BTreeSet<usize>,
 }
 
 impl Selection {
     pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty() && self.comments.is_empty() && self.wires.is_empty()
+        self.nodes.is_empty()
+            && self.comments.is_empty()
+            && self.wires.is_empty()
+            && self.ties.is_empty()
     }
 
     pub fn clear(&mut self) {
@@ -123,7 +128,10 @@ pub enum Action {
     },
     /// A domain menu item the profile left to the host (its id and the target
     /// it was chosen on).
-    Custom { id: String, target: MenuTarget },
+    Custom {
+        id: String,
+        target: MenuTarget,
+    },
     /// The drag target refused the connection.
     ConnectionRefused(String),
     /// Put this text on the system clipboard.
@@ -185,6 +193,18 @@ enum Mode {
         replacing: Option<(usize, Connection)>,
         snapped: Option<PinAddr>,
     },
+    /// Middle-drag over wires: once the drag crosses wires, release creates a
+    /// zip tie clamping them.
+    ZipLasso {
+        start: Vec2,
+    },
+    /// Middle-drag on a tie bar: the bundle moves with the cursor (scene
+    /// transient), a `MoveZipTie` is committed if it moved.
+    MoveZipTie {
+        index: usize,
+        origin: Vec2,
+        down: Vec2,
+    },
 }
 
 pub struct Controller {
@@ -201,6 +221,8 @@ pub struct Controller {
     guides: Vec<Rect>,
     compatible: HashSet<PinAddr>,
     clipboard: Option<String>,
+    /// Live while zip-tying: (drag start, current graph point).
+    zip_lasso: Option<(Vec2, Vec2)>,
 }
 
 impl Controller {
@@ -218,6 +240,7 @@ impl Controller {
             guides: Vec::new(),
             compatible: HashSet::new(),
             clipboard: None,
+            zip_lasso: None,
         }
     }
 
@@ -232,13 +255,17 @@ impl Controller {
     pub fn cursor(&self) -> CursorHint {
         match &self.mode {
             Mode::Pan { .. } => CursorHint::Grabbing,
-            Mode::MoveNodes { .. } | Mode::MoveComment { .. } => CursorHint::Move,
+            Mode::MoveNodes { .. } | Mode::MoveComment { .. } | Mode::MoveZipTie { .. } => {
+                CursorHint::Move
+            }
             Mode::ResizeComment { .. } => CursorHint::ResizeNwse,
-            Mode::Connect { .. } => CursorHint::Crosshair,
+            Mode::Connect { .. } | Mode::ZipLasso { .. } => CursorHint::Crosshair,
             Mode::Marquee { .. } => CursorHint::Default,
             _ => match self.hover {
                 Some(Hit::Pin(_)) => CursorHint::Crosshair,
-                Some(Hit::PinWidget(_)) | Some(Hit::Wire(_)) => CursorHint::Pointer,
+                Some(Hit::PinWidget(_)) | Some(Hit::Wire(_)) | Some(Hit::ZipTie(_)) => {
+                    CursorHint::Pointer
+                }
                 Some(Hit::CommentResize(_)) => CursorHint::ResizeNwse,
                 Some(Hit::CommentHeader(_))
                 | Some(Hit::Node {
@@ -257,9 +284,11 @@ impl Controller {
             selected_nodes: self.selection.nodes.iter().cloned().collect(),
             selected_comments: self.selection.comments.iter().copied().collect(),
             selected_wires: self.selection.wires.iter().copied().collect(),
+            selected_ties: self.selection.ties.iter().copied().collect(),
             focused_node: self.focused.clone(),
             marquee: self.marquee,
             guides: self.guides.clone(),
+            zip_preview: self.zip_lasso,
             ..Default::default()
         };
         match &self.mode {
@@ -413,15 +442,29 @@ impl Controller {
         let hit = cx.scene.hit_test(g, self.view.zoom, self.tolerance());
         out.redraw = true;
         match button {
-            MouseButton::Middle => {
-                self.mode = Mode::Pan {
-                    last: pos,
-                    button,
-                    start: pos,
-                    moved: false,
-                    target: MenuTarget::Canvas { graph_pos: g },
-                };
-            }
+            MouseButton::Middle => match hit {
+                Hit::ZipTie(index) => {
+                    self.mode = Mode::MoveZipTie {
+                        index,
+                        origin: cx.scene.ties[index].position,
+                        down: g,
+                    };
+                }
+                Hit::Wire(_) => {
+                    // Tying gesture: drag across wires to clamp them together.
+                    self.zip_lasso = Some((g, g));
+                    self.mode = Mode::ZipLasso { start: g };
+                }
+                _ => {
+                    self.mode = Mode::Pan {
+                        last: pos,
+                        button,
+                        start: pos,
+                        moved: false,
+                        target: MenuTarget::Canvas { graph_pos: g },
+                    };
+                }
+            },
             MouseButton::Right => {
                 let target = self.menu_target(&hit, cx, g);
                 if let Hit::Node { node, .. } = hit {
@@ -463,6 +506,7 @@ impl Controller {
                 .cloned()
                 .map_or(MenuTarget::Canvas { graph_pos: g }, MenuTarget::Wire),
             Hit::CommentHeader(i) | Hit::CommentResize(i) => MenuTarget::Comment(i),
+            Hit::ZipTie(_) => MenuTarget::Canvas { graph_pos: g },
             Hit::None => MenuTarget::Canvas { graph_pos: g },
         }
     }
@@ -654,6 +698,13 @@ impl Controller {
                     self.selection.clear();
                 }
                 self.selection.wires.insert(ci);
+                out.actions.push(Action::SelectionChanged);
+            }
+            Hit::ZipTie(i) => {
+                if !mods.additive() {
+                    self.selection.clear();
+                }
+                self.selection.ties.insert(i);
                 out.actions.push(Action::SelectionChanged);
             }
             Hit::None => {
@@ -966,6 +1017,24 @@ impl Controller {
                     snapped,
                 };
             }
+            Mode::ZipLasso { start } => {
+                self.zip_lasso = Some((start, g));
+                out.redraw = true;
+                self.mode = Mode::ZipLasso { start };
+            }
+            Mode::MoveZipTie {
+                index,
+                origin,
+                down,
+            } => {
+                cx.scene.set_zip_tie_position(index, origin + (g - down));
+                out.redraw = true;
+                self.mode = Mode::MoveZipTie {
+                    index,
+                    origin,
+                    down,
+                };
+            }
         }
     }
 
@@ -1098,6 +1167,78 @@ impl Controller {
             } => {
                 self.finish_connect(anchor, replacing, snapped, pos, g, cx, out);
                 self.compatible.clear();
+            }
+            Mode::ZipLasso { start } => {
+                self.zip_lasso = None;
+                if button == MouseButton::Middle && start.distance(g) > 1.0 {
+                    let mut wires: Vec<(f32, graphy::ZipTieEdge)> = cx
+                        .scene
+                        .wires
+                        .iter()
+                        .filter_map(|wire| {
+                            let points = wire.shape.flatten(48);
+                            let crossed = points.windows(2).any(|pair| {
+                                segments_distance(start, g, pair[0], pair[1])
+                                    <= self.tolerance().tie_px / self.view.zoom
+                            });
+                            if !crossed {
+                                return None;
+                            }
+                            let connection = cx.graph.connections.get(wire.connection)?;
+                            let edge = graphy::ZipTieEdge::of(connection);
+                            if cx
+                                .graph
+                                .zip_ties
+                                .iter()
+                                .any(|tie| tie.wires.iter().any(|member| member == &edge))
+                            {
+                                return None;
+                            }
+                            let a = cx.scene.nodes[wire.from_node]
+                                .pin_pos(PinSide::Output, wire.from_pin)?;
+                            let b = cx.scene.nodes[wire.to_node]
+                                .pin_pos(PinSide::Input, wire.to_pin)?;
+                            let midpoint = (a + b) * 0.5 - start;
+                            let drag = g - start;
+                            let along = midpoint.x * drag.x + midpoint.y * drag.y;
+                            Some((along, edge))
+                        })
+                        .collect();
+                    wires.sort_by(|a, b| a.0.total_cmp(&b.0));
+                    wires.dedup_by(|a, b| a.1 == b.1);
+                    if wires.len() >= 2 {
+                        out.actions.push(Action::Commands {
+                            label: "Zip tie wires",
+                            commands: vec![GraphCommand::AddZipTie {
+                                index: cx.graph.zip_ties.len(),
+                                tie: graphy::GraphZipTie {
+                                    position: Position {
+                                        x: g.x as f64,
+                                        y: g.y as f64,
+                                    },
+                                    wires: wires.into_iter().map(|(_, edge)| edge).collect(),
+                                },
+                            }],
+                        });
+                    }
+                }
+            }
+            Mode::MoveZipTie { index, origin, .. } => {
+                if button == MouseButton::Middle {
+                    let now = cx.scene.ties[index].position;
+                    if now != origin {
+                        out.actions.push(Action::Commands {
+                            label: "Move zip tie",
+                            commands: vec![GraphCommand::MoveZipTie {
+                                index,
+                                x: now.x as f64,
+                                y: now.y as f64,
+                            }],
+                        });
+                    }
+                } else {
+                    cx.scene.set_zip_tie_position(index, origin);
+                }
             }
         }
     }
@@ -1343,6 +1484,8 @@ impl Controller {
                 }
             }
             Mode::ResizeComment { index, origin, .. } => cx.scene.set_comment_rect(index, origin),
+            Mode::MoveZipTie { index, origin, .. } => cx.scene.set_zip_tie_position(index, origin),
+            Mode::ZipLasso { .. } => self.zip_lasso = None,
             Mode::Idle => {
                 if !self.selection.is_empty() {
                     self.selection.clear();
@@ -1391,17 +1534,22 @@ impl Controller {
                 .filter(|i| cx.scene.comments.get(**i).is_some_and(|c| c.editable))
                 .map(|&index| GraphCommand::RemoveComment { index }),
         );
+        // Remove high indices first so each remaining selected index stays valid.
+        cmds.extend(
+            self.selection
+                .ties
+                .iter()
+                .rev()
+                .map(|&index| GraphCommand::RemoveZipTie { index }),
+        );
         cmds
     }
 
-    /// Q: move every selected node so its touching wires run level between the
-    /// two pins. One wire fixes the node's vertical offset exactly; with
-    /// several wires the offsets disagree (each pin sits at its own height),
-    /// so they are averaged and the node ends up centred between its
-    /// connections. Columns are left where they are: only Y moves, and wires
-    /// between two selected nodes are skipped (neither end can be the anchor).
+    /// Q: make wires touching selected nodes as level as possible with the
+    /// smallest vertical movement. A tiny movement penalty resolves the free
+    /// translation of selected groups that have no fixed neighbours.
     fn straighten_commands(&self, cx: &GraphCtx) -> Vec<GraphCommand> {
-        let selected: HashSet<usize> = self
+        let selected: Vec<usize> = self
             .selection
             .nodes
             .iter()
@@ -1410,51 +1558,77 @@ impl Controller {
         if selected.is_empty() {
             return Vec::new();
         }
-        let mut offsets: HashMap<usize, (f32, u32)> = HashMap::new();
+        let variables: HashMap<usize, usize> = selected
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+        let n = selected.len();
+        let mut normal = vec![vec![0.0f64; n + 1]; n];
         for w in &cx.scene.wires {
-            for (mover, m_side, m_pin, other, o_side, o_pin) in [
-                (
-                    w.from_node,
-                    PinSide::Output,
-                    w.from_pin,
-                    w.to_node,
-                    PinSide::Input,
-                    w.to_pin,
-                ),
-                (
-                    w.to_node,
-                    PinSide::Input,
-                    w.to_pin,
-                    w.from_node,
-                    PinSide::Output,
-                    w.from_pin,
-                ),
-            ] {
-                if !selected.contains(&mover) || selected.contains(&other) {
-                    continue;
+            let (Some(from), Some(to)) = (
+                cx.scene.nodes[w.from_node].pin_pos(PinSide::Output, w.from_pin),
+                cx.scene.nodes[w.to_node].pin_pos(PinSide::Input, w.to_pin),
+            ) else {
+                continue;
+            };
+            let mut terms = Vec::with_capacity(2);
+            if let Some(&i) = variables.get(&w.from_node) {
+                terms.push((i, -1.0f64));
+            }
+            if let Some(&i) = variables.get(&w.to_node) {
+                terms.push((i, 1.0f64));
+            }
+            if terms.is_empty() {
+                continue;
+            }
+            let delta = (to.y - from.y) as f64;
+            for &(i, ai) in &terms {
+                normal[i][n] -= ai * delta;
+                for &(j, aj) in &terms {
+                    normal[i][j] += ai * aj;
                 }
-                let Some(mine) = cx.scene.nodes[mover].pin_pos(m_side, m_pin) else {
-                    continue;
-                };
-                let Some(theirs) = cx.scene.nodes[other].pin_pos(o_side, o_pin) else {
-                    continue;
-                };
-                let entry = offsets.entry(mover).or_insert((0.0, 0));
-                entry.0 += theirs.y - mine.y;
-                entry.1 += 1;
             }
         }
-        offsets
+        for i in 0..n {
+            normal[i][i] += 1e-6;
+        }
+        // Solve the regularized normal equations with pivoted Gauss-Jordan.
+        for col in 0..n {
+            let pivot = (col..n)
+                .max_by(|&a, &b| normal[a][col].abs().total_cmp(&normal[b][col].abs()))
+                .unwrap_or(col);
+            if normal[pivot][col].abs() < f64::EPSILON {
+                continue;
+            }
+            normal.swap(col, pivot);
+            let scale = normal[col][col];
+            for j in col..=n {
+                normal[col][j] /= scale;
+            }
+            for row in 0..n {
+                if row == col {
+                    continue;
+                }
+                let factor = normal[row][col];
+                for j in col..=n {
+                    normal[row][j] -= factor * normal[col][j];
+                }
+            }
+        }
+        selected
             .into_iter()
-            .filter_map(|(i, (sum, count))| {
-                let dy = sum / count as f32;
-                (dy.abs() > f32::EPSILON).then(|| {
-                    let n = &cx.scene.nodes[i];
-                    GraphCommand::MoveNode {
-                        id: n.id.clone(),
-                        x: n.pos.x as f64,
-                        y: (n.pos.y + dy) as f64,
-                    }
+            .enumerate()
+            .filter_map(|(i, node_i)| {
+                let dy = normal[i][n];
+                if dy.abs() < 1e-3 {
+                    return None;
+                }
+                let node = &cx.scene.nodes[node_i];
+                Some(GraphCommand::MoveNode {
+                    id: node.id.clone(),
+                    x: node.pos.x as f64,
+                    y: node.pos.y as f64 + dy,
                 })
             })
             .collect()
@@ -1673,6 +1847,25 @@ fn same_edge(a: &Connection, b: &Connection) -> bool {
 /// already applied are undone and the error is returned, leaving the graph
 /// unchanged. On success the combined change set (for undo and
 /// `Scene::apply_changes`) is returned.
+fn segments_distance(a: Vec2, b: Vec2, c: Vec2, d: Vec2) -> f32 {
+    let cross = |u: Vec2, v: Vec2| u.x * v.y - u.y * v.x;
+    let ab = b - a;
+    let cd = d - c;
+    let denom = cross(ab, cd);
+    if denom.abs() > 1e-6 {
+        let ac = c - a;
+        let t = cross(ac, cd) / denom;
+        let u = cross(ac, ab) / denom;
+        if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
+            return 0.0;
+        }
+    }
+    graphy_render::wire::segment_distance(a, c, d)
+        .min(graphy_render::wire::segment_distance(b, c, d))
+        .min(graphy_render::wire::segment_distance(c, a, b))
+        .min(graphy_render::wire::segment_distance(d, a, b))
+}
+
 pub fn apply_transaction(
     graph: &mut GraphDescription,
     commands: &[GraphCommand],

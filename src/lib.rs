@@ -82,6 +82,7 @@ pub use core::{
     DataType,
     GraphDescription,
     GraphMetadata,
+    GraphZipTie,
     JsonValue,
     NodeInstance,
     // v2 types
@@ -102,12 +103,13 @@ pub use core::{
     PropertyValue,
     ReflectedType,
     TypeInfo,
+    ZipTieEdge,
 };
 
 pub use contracts::{
-    can_connect_replacing, diff_commands, check_connection_types, check_invariants, ChainResolver, ChangeSet, Compatibility, EditError,
-    GraphChange, GraphCommand, IdAllocator, NodeId, PinRef, ScopedResolver, StructuralResolver,
-    TypeResolver,
+    can_connect_replacing, check_connection_types, check_invariants, diff_commands, ChainResolver,
+    ChangeSet, Compatibility, EditError, GraphChange, GraphCommand, IdAllocator, NodeId, PinRef,
+    ScopedResolver, StructuralResolver, TypeResolver,
 };
 
 pub use analysis::{DataResolver, DataSource, ExecutionRouting};

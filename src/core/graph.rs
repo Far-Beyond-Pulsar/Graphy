@@ -97,6 +97,57 @@ pub struct GraphDescription {
 
     /// Visual comments for documentation in editors
     pub comments: Vec<GraphComment>,
+
+    /// Zip ties clamping wire bundles through a point. Purely visual: adding,
+    /// moving or removing one never touches the connections.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub zip_ties: Vec<GraphZipTie>,
+}
+
+/// One bundled wire of a [`GraphZipTie`], stored as its edge so a tie survives
+/// node moves and re-loads.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ZipTieEdge {
+    pub source_node: String,
+    pub source_pin: String,
+    pub target_node: String,
+    pub target_pin: String,
+}
+
+impl ZipTieEdge {
+    pub fn of(c: &Connection) -> Self {
+        Self {
+            source_node: c.source_node.clone(),
+            source_pin: c.source_pin.clone(),
+            target_node: c.target_node.clone(),
+            target_pin: c.target_pin.clone(),
+        }
+    }
+
+    /// Whether this edge describes `c`.
+    pub fn matches(&self, c: &Connection) -> bool {
+        self.source_node == c.source_node
+            && self.source_pin == c.source_pin
+            && self.target_node == c.target_node
+            && self.target_pin == c.target_pin
+    }
+}
+
+/// A zip tie: a point a set of wires are drawn through, evenly spaced across
+/// it like a cable clamp. Addressed by index like comments.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphZipTie {
+    /// Where the tie sits, graph units.
+    pub position: super::Position,
+    /// The bundled wires, in the order they were tied (slots follow it).
+    pub wires: Vec<ZipTieEdge>,
+}
+
+impl PartialEq for GraphZipTie {
+    fn eq(&self, other: &Self) -> bool {
+        (self.position.x, self.position.y) == (other.position.x, other.position.y)
+            && self.wires == other.wires
+    }
 }
 
 /// A visual comment in the graph for documentation purposes.
@@ -164,6 +215,7 @@ impl GraphDescription {
             nodes: HashMap::new(),
             connections: Vec::new(),
             comments: Vec::new(),
+            zip_ties: Vec::new(),
         }
     }
 

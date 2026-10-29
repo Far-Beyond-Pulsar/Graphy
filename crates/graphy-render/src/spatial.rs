@@ -92,6 +92,7 @@ pub struct SpatialIndex {
     pub nodes: Layer,
     pub comments: Layer,
     pub wires: Layer,
+    pub ties: Layer,
 }
 
 #[cfg(test)]

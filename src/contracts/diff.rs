@@ -13,9 +13,9 @@ fn edge_key(c: &Connection) -> (&str, &str, &str, &str) {
 fn pins_equal(a: &NodeInstance, b: &NodeInstance) -> bool {
     let same = |x: &[crate::PinInstance], y: &[crate::PinInstance]| {
         x.len() == y.len()
-            && x.iter()
-                .zip(y)
-                .all(|(p, q)| p.id == q.id && p.pin.name == q.pin.name && p.pin.data_type == q.pin.data_type)
+            && x.iter().zip(y).all(|(p, q)| {
+                p.id == q.id && p.pin.name == q.pin.name && p.pin.data_type == q.pin.data_type
+            })
     };
     same(&a.inputs, &b.inputs) && same(&a.outputs, &b.outputs)
 }
@@ -35,7 +35,12 @@ pub fn diff_commands(before: &GraphDescription, after: &GraphDescription) -> Vec
     let replaced: HashSet<&str> = before
         .nodes
         .iter()
-        .filter(|(id, n)| after.nodes.get(*id).map_or(true, |m| m.node_type != n.node_type))
+        .filter(|(id, n)| {
+            after
+                .nodes
+                .get(*id)
+                .map_or(true, |m| m.node_type != n.node_type)
+        })
         .map(|(id, _)| id.as_str())
         .collect();
 
@@ -129,6 +134,17 @@ pub fn diff_commands(before: &GraphDescription, after: &GraphDescription) -> Vec
             cmds.push(GraphCommand::AddComment {
                 index,
                 comment: comment.clone(),
+            });
+        }
+    }
+    if before.zip_ties != after.zip_ties {
+        for index in (0..before.zip_ties.len()).rev() {
+            cmds.push(GraphCommand::RemoveZipTie { index });
+        }
+        for (index, tie) in after.zip_ties.iter().enumerate() {
+            cmds.push(GraphCommand::AddZipTie {
+                index,
+                tie: tie.clone(),
             });
         }
     }

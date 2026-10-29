@@ -1,6 +1,6 @@
 //! Hit testing, derived from the same [`crate::NodeLayout`] the renderer
 //! draws from. Priority: pins, then nodes (top-most first), then comment
-//! chrome, then wires.
+//! chrome, then tie bars, then wires.
 
 use crate::geom::{Rect, Vec2};
 use crate::layout::{NodeShape, PinSide, RowContent};
@@ -34,6 +34,8 @@ pub enum Hit {
     Wire(usize),
     CommentHeader(usize),
     CommentResize(usize),
+    /// A zip tie bar.
+    ZipTie(usize),
 }
 
 /// Screen-pixel tolerances; converted to graph units by the current zoom.
@@ -41,6 +43,8 @@ pub enum Hit {
 pub struct HitTolerance {
     pub pin_px: f32,
     pub wire_px: f32,
+    /// Ties get a deliberately forgiving hitbox.
+    pub tie_px: f32,
 }
 
 impl Default for HitTolerance {
@@ -48,6 +52,7 @@ impl Default for HitTolerance {
         Self {
             pin_px: 9.0,
             wire_px: 6.0,
+            tie_px: 12.0,
         }
     }
 }
@@ -171,6 +176,24 @@ impl Scene {
             .map(|(wi, _)| wi)
     }
 
+    /// Zip tie whose bar (a forgiving strip around its centre line) contains
+    /// `p`; empty ties never hit.
+    pub fn tie_at(&self, p: Vec2, zoom: f32, tol: HitTolerance) -> Option<usize> {
+        let radius = tol.tie_px / zoom;
+        self.spatial
+            .ties
+            .query(Rect::around(p, radius), true)
+            .into_iter()
+            .filter(|&ti| !self.ties[ti].members.is_empty())
+            .map(|ti| {
+                let (a, b) = self.ties[ti].segment();
+                (ti, crate::wire::segment_distance(p, a, b))
+            })
+            .filter(|(_, d)| *d <= radius)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(ti, _)| ti)
+    }
+
     pub fn hit_test(&self, p: Vec2, zoom: f32, tol: HitTolerance) -> Hit {
         if let Some(a) = self.pin_at(p, zoom, tol) {
             return Hit::Pin(a);
@@ -183,6 +206,9 @@ impl Scene {
         }
         if let Some(h) = self.comment_at(p, zoom) {
             return h;
+        }
+        if let Some(ti) = self.tie_at(p, zoom, tol) {
+            return Hit::ZipTie(ti);
         }
         if let Some(w) = self.wire_at(p, zoom, tol) {
             return Hit::Wire(w);

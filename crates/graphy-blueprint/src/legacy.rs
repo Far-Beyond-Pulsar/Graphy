@@ -107,6 +107,7 @@ impl From<LegacyGraphDescription> for GraphDescription {
             metadata: legacy.metadata,
             comments: legacy.comments.into_iter().map(|c| c.into()).collect(),
             custom_event_defs: HashMap::new(),
+            zip_ties: Vec::new(),
         }
     }
 }

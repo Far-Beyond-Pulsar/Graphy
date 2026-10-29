@@ -9,23 +9,44 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::GraphComment;
-use crate::{Connection, ConnectionType, GraphDescription, JsonValue, NodeInstance, PinInstance, Position};
+use crate::core::{GraphComment, GraphZipTie};
+use crate::{
+    Connection, ConnectionType, GraphDescription, JsonValue, NodeInstance, PinInstance, Position,
+};
 
 /// A requested edit.
 #[derive(Debug, Clone)]
 pub enum GraphCommand {
     AddNode(NodeInstance),
     /// Removes the node and every connection touching it.
-    RemoveNode { id: String },
-    MoveNode { id: String, x: f64, y: f64 },
+    RemoveNode {
+        id: String,
+    },
+    MoveNode {
+        id: String,
+        x: f64,
+        y: f64,
+    },
     /// Moves the comment at `index` (comments have no ids; they are addressed by position).
-    MoveComment { index: usize, x: f64, y: f64 },
+    MoveComment {
+        index: usize,
+        x: f64,
+        y: f64,
+    },
     /// Resizes the comment at `index`.
-    ResizeComment { index: usize, width: f64, height: f64 },
+    ResizeComment {
+        index: usize,
+        width: f64,
+        height: f64,
+    },
     /// Inserts a comment at `index` (appends when `index` is past the end).
-    AddComment { index: usize, comment: GraphComment },
-    RemoveComment { index: usize },
+    AddComment {
+        index: usize,
+        comment: GraphComment,
+    },
+    RemoveComment {
+        index: usize,
+    },
     /// Replaces the comment at `index` text/colour/containment in one edit.
     EditComment {
         index: usize,
@@ -47,6 +68,21 @@ pub enum GraphCommand {
         node: String,
         inputs: Vec<PinInstance>,
         outputs: Vec<PinInstance>,
+    },
+    /// Adds a zip tie clamping a set of wires through a point.
+    AddZipTie {
+        index: usize,
+        tie: GraphZipTie,
+    },
+    /// Moves the zip tie at `index`.
+    MoveZipTie {
+        index: usize,
+        x: f64,
+        y: f64,
+    },
+    /// Removes the zip tie at `index` (its wires stay connected).
+    RemoveZipTie {
+        index: usize,
     },
 }
 
@@ -80,9 +116,19 @@ pub enum GraphChange {
         from: (f64, f64),
         to: (f64, f64),
     },
-    CommentAdded { index: usize, comment: GraphComment },
-    CommentRemoved { index: usize, comment: GraphComment },
-    CommentEdited { index: usize, old: GraphComment, new: GraphComment },
+    CommentAdded {
+        index: usize,
+        comment: GraphComment,
+    },
+    CommentRemoved {
+        index: usize,
+        comment: GraphComment,
+    },
+    CommentEdited {
+        index: usize,
+        old: GraphComment,
+        new: GraphComment,
+    },
     ConnectionAdded(Connection),
     ConnectionRemoved(IndexedConnection),
     PropertySet {
@@ -98,6 +144,19 @@ pub enum GraphChange {
         new_inputs: Vec<PinInstance>,
         new_outputs: Vec<PinInstance>,
         removed_connections: Vec<IndexedConnection>,
+    },
+    ZipTieAdded {
+        index: usize,
+        tie: GraphZipTie,
+    },
+    ZipTieMoved {
+        index: usize,
+        from: (f64, f64),
+        to: (f64, f64),
+    },
+    ZipTieRemoved {
+        index: usize,
+        tie: GraphZipTie,
     },
 }
 
@@ -133,6 +192,8 @@ pub enum EditError {
     ExecOutputOccupied(String),
     #[error("duplicate pin id '{0}'")]
     DuplicatePin(String),
+    #[error("zip tie {0} does not exist")]
+    NoSuchZipTie(usize),
 }
 
 fn same_edge(a: &Connection, b: &Connection) -> bool {
@@ -207,30 +268,53 @@ impl GraphCommand {
                     .ok_or(EditError::NoSuchComment(*index))?;
                 let from = (c.position.x, c.position.y);
                 c.position = Position { x: *x, y: *y };
-                GraphChange::CommentMoved { index: *index, from, to: (*x, *y) }
+                GraphChange::CommentMoved {
+                    index: *index,
+                    from,
+                    to: (*x, *y),
+                }
             }
-            GraphCommand::ResizeComment { index, width, height } => {
+            GraphCommand::ResizeComment {
+                index,
+                width,
+                height,
+            } => {
                 let c = graph
                     .comments
                     .get_mut(*index)
                     .ok_or(EditError::NoSuchComment(*index))?;
                 let from = c.size;
                 c.size = (*width, *height);
-                GraphChange::CommentResized { index: *index, from, to: (*width, *height) }
+                GraphChange::CommentResized {
+                    index: *index,
+                    from,
+                    to: (*width, *height),
+                }
             }
             GraphCommand::AddComment { index, comment } => {
                 let at = (*index).min(graph.comments.len());
                 graph.comments.insert(at, comment.clone());
-                GraphChange::CommentAdded { index: at, comment: comment.clone() }
+                GraphChange::CommentAdded {
+                    index: at,
+                    comment: comment.clone(),
+                }
             }
             GraphCommand::RemoveComment { index } => {
                 if *index >= graph.comments.len() {
                     return Err(EditError::NoSuchComment(*index));
                 }
                 let comment = graph.comments.remove(*index);
-                GraphChange::CommentRemoved { index: *index, comment }
+                GraphChange::CommentRemoved {
+                    index: *index,
+                    comment,
+                }
             }
-            GraphCommand::EditComment { index, text, color, contained_node_ids } => {
+            GraphCommand::EditComment {
+                index,
+                text,
+                color,
+                contained_node_ids,
+            } => {
                 let c = graph
                     .comments
                     .get_mut(*index)
@@ -245,7 +329,11 @@ impl GraphCommand {
                 if let Some(ids) = contained_node_ids {
                     c.contained_node_ids = ids.clone();
                 }
-                GraphChange::CommentEdited { index: *index, old, new: c.clone() }
+                GraphChange::CommentEdited {
+                    index: *index,
+                    old,
+                    new: c.clone(),
+                }
             }
             GraphCommand::Connect(c) => {
                 check_connect(graph, c)?;
@@ -295,10 +383,10 @@ impl GraphCommand {
                     .into_iter()
                     .filter(|r| {
                         let c = &r.connection;
-                        let src_gone = c.source_node == *node
-                            && !outputs.iter().any(|p| p.id == c.source_pin);
-                        let dst_gone = c.target_node == *node
-                            && !inputs.iter().any(|p| p.id == c.target_pin);
+                        let src_gone =
+                            c.source_node == *node && !outputs.iter().any(|p| p.id == c.source_pin);
+                        let dst_gone =
+                            c.target_node == *node && !inputs.iter().any(|p| p.id == c.target_pin);
                         src_gone || dst_gone
                     })
                     .collect();
@@ -314,6 +402,34 @@ impl GraphCommand {
                     new_outputs: outputs.clone(),
                     removed_connections,
                 }
+            }
+            GraphCommand::AddZipTie { index, tie } => {
+                let at = (*index).min(graph.zip_ties.len());
+                graph.zip_ties.insert(at, tie.clone());
+                GraphChange::ZipTieAdded {
+                    index: at,
+                    tie: tie.clone(),
+                }
+            }
+            GraphCommand::MoveZipTie { index, x, y } => {
+                let t = graph
+                    .zip_ties
+                    .get_mut(*index)
+                    .ok_or(EditError::NoSuchZipTie(*index))?;
+                let from = (t.position.x, t.position.y);
+                t.position = Position { x: *x, y: *y };
+                GraphChange::ZipTieMoved {
+                    index: *index,
+                    from,
+                    to: (*x, *y),
+                }
+            }
+            GraphCommand::RemoveZipTie { index } => {
+                if *index >= graph.zip_ties.len() {
+                    return Err(EditError::NoSuchZipTie(*index));
+                }
+                let tie = graph.zip_ties.remove(*index);
+                GraphChange::ZipTieRemoved { index: *index, tie }
             }
         };
         Ok(ChangeSet {
@@ -410,7 +526,10 @@ impl ChangeSet {
                 }
                 GraphChange::CommentMoved { index, from, .. } => {
                     if let Some(c) = graph.comments.get_mut(*index) {
-                        c.position = Position { x: from.0, y: from.1 };
+                        c.position = Position {
+                            x: from.0,
+                            y: from.1,
+                        };
                     }
                 }
                 GraphChange::CommentResized { index, from, .. } => {
@@ -424,7 +543,9 @@ impl ChangeSet {
                     }
                 }
                 GraphChange::CommentRemoved { index, comment } => {
-                    graph.comments.insert((*index).min(graph.comments.len()), comment.clone());
+                    graph
+                        .comments
+                        .insert((*index).min(graph.comments.len()), comment.clone());
                 }
                 GraphChange::CommentEdited { index, old, .. } => {
                     if let Some(c) = graph.comments.get_mut(*index) {
@@ -464,6 +585,24 @@ impl ChangeSet {
                     }
                     restore_indexed(graph, removed_connections);
                 }
+                GraphChange::ZipTieAdded { index, .. } => {
+                    if *index < graph.zip_ties.len() {
+                        graph.zip_ties.remove(*index);
+                    }
+                }
+                GraphChange::ZipTieMoved { index, from, .. } => {
+                    if let Some(t) = graph.zip_ties.get_mut(*index) {
+                        t.position = Position {
+                            x: from.0,
+                            y: from.1,
+                        };
+                    }
+                }
+                GraphChange::ZipTieRemoved { index, tie } => {
+                    graph
+                        .zip_ties
+                        .insert((*index).min(graph.zip_ties.len()), tie.clone());
+                }
             }
         }
     }
@@ -488,10 +627,14 @@ impl ChangeSet {
                     }
                 }
                 GraphChange::NodeMoved { id, .. } => add(id),
-                GraphChange::CommentMoved { .. } | GraphChange::CommentResized { .. }
+                GraphChange::CommentMoved { .. }
+                | GraphChange::CommentResized { .. }
                 | GraphChange::CommentAdded { .. }
                 | GraphChange::CommentRemoved { .. }
                 | GraphChange::CommentEdited { .. } => {}
+                GraphChange::ZipTieAdded { .. }
+                | GraphChange::ZipTieMoved { .. }
+                | GraphChange::ZipTieRemoved { .. } => {}
                 GraphChange::ConnectionAdded(c) => {
                     add(&c.source_node);
                     add(&c.target_node);

@@ -39,6 +39,8 @@ pub mod flags {
     pub const COMPATIBLE: u32 = 1 << 11;
     /// Pin: wire tail from the card edge to the pin.
     pub const RINGED: u32 = 1 << 12;
+    /// Wire: static dash pattern (zip ties).
+    pub const DASHED: u32 = 1 << 13;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -189,9 +191,13 @@ pub struct InteractionState {
     pub selected_nodes: HashSet<String>,
     pub selected_comments: HashSet<usize>,
     pub selected_wires: HashSet<usize>,
+    /// Zip ties (scene indices) included in the selection.
+    pub selected_ties: HashSet<usize>,
     pub focused_node: Option<String>,
     /// Connections (by document index) not drawn, e.g. a wire picked up for re-routing.
     pub hidden_connections: HashSet<usize>,
+    /// Middle-drag lasso preview while tying wires: (start, current).
+    pub zip_preview: Option<(Vec2, Vec2)>,
     pub dragging_nodes: HashSet<String>,
     pub marquee: Option<Rect>,
     pub guides: Vec<Rect>,
@@ -379,6 +385,36 @@ impl Scene {
         out.wires.extend(normal);
         out.wires.extend(emph);
 
+        // ---- zip ties (over wires, under nodes) ----------------------------
+        for ti in self.spatial.ties.query(visible, false) {
+            let t = &self.ties[ti];
+            if t.members.is_empty() {
+                continue;
+            }
+            let hovered = matches!(st.hovered, Some(Hit::ZipTie(i)) if i == ti);
+            let selected = st.selected_ties.contains(&ti);
+            let mut f = flags::EMPHASIS | flags::DASHED;
+            if hovered {
+                f |= flags::HOVERED;
+            }
+            if selected {
+                f |= flags::SELECTED;
+            }
+            let (a, b) = t.segment();
+            out.wires.push(WireDraw {
+                shape: WireShape::straight(a, b),
+                color: if hovered || selected {
+                    theme.select
+                } else {
+                    theme.focus
+                },
+                width: p.weights.emphasis.max(4.0),
+                flags: f,
+                phase: 0.0,
+                segments: 24,
+            });
+        }
+
         // ---- nodes, pins, text --------------------------------------------
         let node_ids = self.spatial.nodes.query(visible, false);
         out.stats.nodes = node_ids.len();
@@ -443,6 +479,16 @@ impl Scene {
                     });
                 }
             }
+        }
+        if let Some((start, cur)) = st.zip_preview {
+            out.overlay_wires.push(WireDraw {
+                shape: WireShape::straight(start, cur),
+                color: theme.focus,
+                width: p.weights.emphasis.max(3.0),
+                flags: flags::PREVIEW | flags::EMPHASIS | flags::DASHED,
+                phase: 0.0,
+                segments: 32,
+            });
         }
         out.stats.pins = out.pins.len();
         out.stats.texts = out.texts.len();
