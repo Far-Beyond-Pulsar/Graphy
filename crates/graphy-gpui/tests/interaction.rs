@@ -544,7 +544,7 @@ fn duplicate_offsets_from_the_selection() {
 }
 
 #[test]
-fn wheel_zoom_anchors_and_pan_drags_move_the_view() {
+fn wheel_zoom_anchors_middle_drag_is_zip_preview_and_right_drag_pans() {
     let mut r = Rig::new();
     let anchor = Vec2::new(500.0, 300.0);
     let under = r.ctl.view.screen_to_graph(anchor);
@@ -568,9 +568,27 @@ fn wheel_zoom_anchors_and_pan_drags_move_the_view() {
         pos: Vec2::new(160.0, 130.0),
         mods: NONE,
     });
+    assert!(r.ctl.interaction_state(&r.scene).zip_preview.is_some());
     r.send(InputEvent::PointerUp {
         pos: Vec2::new(160.0, 130.0),
         button: MouseButton::Middle,
+        mods: NONE,
+    });
+    assert_eq!(r.ctl.view.pan, pan0);
+
+    r.send(InputEvent::PointerDown {
+        pos: Vec2::new(100.0, 100.0),
+        button: MouseButton::Right,
+        mods: NONE,
+        clicks: 1,
+    });
+    r.send(InputEvent::PointerMove {
+        pos: Vec2::new(160.0, 130.0),
+        mods: NONE,
+    });
+    r.send(InputEvent::PointerUp {
+        pos: Vec2::new(160.0, 130.0),
+        button: MouseButton::Right,
         mods: NONE,
     });
     assert_ne!(r.ctl.view.pan, pan0);

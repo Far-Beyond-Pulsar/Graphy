@@ -484,7 +484,9 @@ impl Scene {
             out.overlay_wires.push(WireDraw {
                 shape: WireShape::straight(start, cur),
                 color: theme.focus,
-                width: p.weights.emphasis.max(3.0),
+                // Wire widths are in graph units. Keep the gesture preview
+                // readable at low zoom levels as well as at normal scale.
+                width: p.weights.emphasis.max(2.5 / p.view.zoom.max(0.01)),
                 flags: flags::PREVIEW | flags::EMPHASIS | flags::DASHED,
                 phase: 0.0,
                 segments: 32,

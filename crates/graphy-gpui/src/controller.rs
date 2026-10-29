@@ -450,19 +450,11 @@ impl Controller {
                         down: g,
                     };
                 }
-                Hit::Wire(_) => {
-                    // Tying gesture: drag across wires to clamp them together.
+                _ => {
+                    // Tying gesture starts anywhere so the stroke can cross wires
+                    // from empty canvas, nodes, or other graph content.
                     self.zip_lasso = Some((g, g));
                     self.mode = Mode::ZipLasso { start: g };
-                }
-                _ => {
-                    self.mode = Mode::Pan {
-                        last: pos,
-                        button,
-                        start: pos,
-                        moved: false,
-                        target: MenuTarget::Canvas { graph_pos: g },
-                    };
                 }
             },
             MouseButton::Right => {
@@ -1171,6 +1163,7 @@ impl Controller {
             Mode::ZipLasso { start } => {
                 self.zip_lasso = None;
                 if button == MouseButton::Middle && start.distance(g) > 1.0 {
+                    let tie_center = (start + g) * 0.5;
                     let mut wires: Vec<(f32, graphy::ZipTieEdge)> = cx
                         .scene
                         .wires
@@ -1213,8 +1206,8 @@ impl Controller {
                                 index: cx.graph.zip_ties.len(),
                                 tie: graphy::GraphZipTie {
                                     position: Position {
-                                        x: g.x as f64,
-                                        y: g.y as f64,
+                                            x: tie_center.x as f64,
+                                            y: tie_center.y as f64,
                                     },
                                     wires: wires.into_iter().map(|(_, edge)| edge).collect(),
                                 },
@@ -1546,8 +1539,9 @@ impl Controller {
     }
 
     /// Q: make wires touching selected nodes as level as possible with the
-    /// smallest vertical movement. A tiny movement penalty resolves the free
-    /// translation of selected groups that have no fixed neighbours.
+    /// smallest vertical movement. One selected node per connected group stays
+    /// fixed, so a two-node straighten moves only one node and cannot translate
+    /// the pair to an arbitrary height.
     fn straighten_commands(&self, cx: &GraphCtx) -> Vec<GraphCommand> {
         let selected: Vec<usize> = self
             .selection
@@ -1558,12 +1552,53 @@ impl Controller {
         if selected.is_empty() {
             return Vec::new();
         }
-        let variables: HashMap<usize, usize> = selected
+        let selected_set: HashSet<usize> = selected.iter().copied().collect();
+        let mut selected_edges = vec![Vec::new(); cx.scene.nodes.len()];
+        for wire in &cx.scene.wires {
+            if selected_set.contains(&wire.from_node) && selected_set.contains(&wire.to_node) {
+                selected_edges[wire.from_node].push(wire.to_node);
+                selected_edges[wire.to_node].push(wire.from_node);
+            }
+        }
+        let mut anchors = HashSet::new();
+        let mut visited = HashSet::new();
+        for &start in &selected {
+            if !visited.insert(start) {
+                continue;
+            }
+            let mut component = vec![start];
+            let mut pending = vec![start];
+            while let Some(node) = pending.pop() {
+                for &other in &selected_edges[node] {
+                    if visited.insert(other) {
+                        component.push(other);
+                        pending.push(other);
+                    }
+                }
+            }
+            if component.len() > 1 {
+                let anchor = self
+                    .focused
+                    .as_ref()
+                    .and_then(|id| cx.scene.node_index(id))
+                    .filter(|node| component.contains(node))
+                    .unwrap_or(component[0]);
+                anchors.insert(anchor);
+            }
+        }
+        let movers: Vec<usize> = selected
+            .into_iter()
+            .filter(|node| !anchors.contains(node))
+            .collect();
+        let variables: HashMap<usize, usize> = movers
             .iter()
             .enumerate()
             .map(|(i, &node)| (node, i))
             .collect();
-        let n = selected.len();
+        let n = movers.len();
+        if n == 0 {
+            return Vec::new();
+        }
         let mut normal = vec![vec![0.0f64; n + 1]; n];
         for w in &cx.scene.wires {
             let (Some(from), Some(to)) = (
@@ -1616,12 +1651,12 @@ impl Controller {
                 }
             }
         }
-        selected
+        movers
             .into_iter()
             .enumerate()
             .filter_map(|(i, node_i)| {
                 let dy = normal[i][n];
-                if dy.abs() < 1e-3 {
+                if dy.abs() < 0.5 {
                     return None;
                 }
                 let node = &cx.scene.nodes[node_i];
