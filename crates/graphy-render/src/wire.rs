@@ -33,6 +33,17 @@ pub enum WireRouting {
 }
 
 impl WireShape {
+    /// A cubic Bezier from four explicit points.
+    pub fn cubic(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2) -> WireShape {
+        let mut pts = [Vec2::ZERO; 6];
+        pts[..4].copy_from_slice(&[p0, p1, p2, p3]);
+        WireShape {
+            routing: WireRouting::Bezier,
+            n: 4,
+            pts,
+        }
+    }
+
     pub fn new(routing: WireRouting, from: Vec2, to: Vec2) -> WireShape {
         match routing {
             WireRouting::Bezier => Self::bezier(from, to),

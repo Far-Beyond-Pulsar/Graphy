@@ -360,24 +360,22 @@ impl Scene {
                 f |= flags::ACTIVE;
             }
             let width = if w.style.exec { width * 1.12 } else { width };
-            let draw = WireDraw {
-                shape: w.shape,
-                color,
-                width: if lod == LodTier::Overview {
-                    width * 1.4
+            for shape in w.shapes() {
+                let draw = WireDraw {
+                    shape: *shape,
+                    color,
+                    width: if lod == LodTier::Overview { width * 1.4 } else { width },
+                    flags: f,
+                    phase: ((wi as u32).wrapping_mul(2654435761) >> 8) as f32 / (1u32 << 24) as f32,
+                    segments: lod.wire_segments(),
+                };
+                if f & flags::EMPHASIS != 0 {
+                    emph.push(draw);
+                } else if f & flags::DIM != 0 {
+                    dim.push(draw);
                 } else {
-                    width
-                },
-                flags: f,
-                phase: ((wi as u32).wrapping_mul(2654435761) >> 8) as f32 / (1u32 << 24) as f32,
-                segments: lod.wire_segments(),
-            };
-            if f & flags::EMPHASIS != 0 {
-                emph.push(draw);
-            } else if f & flags::DIM != 0 {
-                dim.push(draw);
-            } else {
-                normal.push(draw);
+                    normal.push(draw);
+                }
             }
         }
         out.stats.wires = dim.len() + normal.len() + emph.len();

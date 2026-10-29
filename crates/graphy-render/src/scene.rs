@@ -18,6 +18,26 @@ use crate::spatial::{Entry, SpatialIndex};
 use crate::text::TextMeasure;
 use crate::wire::{WireRouting, WireShape};
 
+fn unit(v: Vec2) -> Vec2 {
+    let len = v.length();
+    if len <= 1e-6 {
+        Vec2::new(1.0, 0.0)
+    } else {
+        v * (1.0 / len)
+    }
+}
+
+fn smooth_transition(from: Vec2, to: Vec2, start_tangent: Vec2, end_tangent: Vec2) -> WireShape {
+    let distance = from.distance(to);
+    let handle = (distance * 0.42).min(90.0).max(12.0).min(distance * 0.48);
+    WireShape::cubic(
+        from,
+        from + unit(start_tangent) * handle,
+        to - unit(end_tangent) * handle,
+        to,
+    )
+}
+
 /// Label widths are capped so a long name truncates instead of growing the
 /// card without bound.
 pub const MAX_LABEL_WIDTH: f32 = 150.0;
@@ -98,6 +118,28 @@ pub struct SceneWire {
     pub to_pin: usize,
     pub style: WireStyle,
     pub shape: WireShape,
+    /// Additional curve/straight sections when this wire crosses more than
+    /// one zip tie.
+    pub extra_shapes: Vec<WireShape>,
+}
+
+impl SceneWire {
+    pub fn shapes(&self) -> impl Iterator<Item = &WireShape> {
+        std::iter::once(&self.shape).chain(self.extra_shapes.iter())
+    }
+
+    pub fn bounds(&self) -> Rect {
+        self.shapes().map(WireShape::bounds).reduce(|a, b| Rect {
+            min: Vec2::new(a.min.x.min(b.min.x), a.min.y.min(b.min.y)),
+            max: Vec2::new(a.max.x.max(b.max.x), a.max.y.max(b.max.y)),
+        }).unwrap_or_else(|| self.shape.bounds())
+    }
+
+    pub fn distance_to(&self, p: Vec2) -> f32 {
+        self.shapes()
+            .map(|shape| shape.distance_to(p))
+            .fold(f32::INFINITY, f32::min)
+    }
 }
 
 /// A resolved zip tie: the wires it clamps and where the bundle runs.
@@ -105,6 +147,8 @@ pub struct SceneWire {
 pub struct SceneTie {
     /// Where the tie sits, graph units.
     pub position: Vec2,
+    /// Straight wire length through the tie, graph units.
+    pub straight_length: f32,
     /// Unit direction the slots spread along (perpendicular to the flow).
     pub axis: Vec2,
     /// Wire indices, in slot order.
@@ -290,6 +334,7 @@ impl Scene {
                 to_pin,
                 style,
                 shape: WireShape::bezier(Vec2::ZERO, Vec2::ZERO),
+                extra_shapes: Vec::new(),
             });
         }
         self.adjacency = vec![Vec::new(); self.nodes.len()];
@@ -308,7 +353,7 @@ impl Scene {
             .wires
             .rebuild(self.wires.iter().enumerate().map(|(i, w)| Entry {
                 index: i,
-                rect: w.shape.bounds().expand(4.0),
+                rect: w.bounds().expand(4.0),
             }));
     }
 
@@ -322,27 +367,87 @@ impl Scene {
         let to = self.nodes[w.to_node]
             .pin_pos(PinSide::Input, w.to_pin)
             .unwrap_or_default();
-        let shape = match self.tied_through(wi) {
-            Some(q) if w.style.routing == WireRouting::Angular => {
-                WireShape::through_angular(from, q, to)
+        let ties = self.ties_for_wire(wi, from, to);
+        let (shape, extra_shapes) = if ties.is_empty() {
+            (WireShape::new(w.style.routing, from, to), Vec::new())
+        } else {
+            let mut shapes = Vec::with_capacity(ties.len() * 2 + 1);
+            let flow = unit(to - from);
+            let mut cursor = from;
+            for (index, (center, length)) in ties.iter().copied().enumerate() {
+                let half = length * 0.5;
+                let start = center - flow * half;
+                let end = center + flow * half;
+                let start_tangent = if index == 0 { Vec2::new(1.0, 0.0) } else { flow };
+                let transition = match w.style.routing {
+                    WireRouting::Bezier => {
+                        smooth_transition(cursor, start, start_tangent, flow)
+                    }
+                    WireRouting::Angular => WireShape::new(WireRouting::Angular, cursor, start),
+                };
+                shapes.push(transition);
+                shapes.push(WireShape::straight(start, end));
+                cursor = end;
             }
-            Some(q) => WireShape::through(from, q, to),
-            None => WireShape::new(w.style.routing, from, to),
+            shapes.push(match w.style.routing {
+                WireRouting::Bezier => {
+                    smooth_transition(cursor, to, flow, Vec2::new(1.0, 0.0))
+                }
+                WireRouting::Angular => WireShape::new(WireRouting::Angular, cursor, to),
+            });
+            let mut shapes = shapes.into_iter();
+            let first = shapes.next().unwrap_or_else(|| WireShape::new(w.style.routing, from, to));
+            (first, shapes.collect())
         };
-        let bounds = shape.bounds().expand(4.0);
+        let bounds = SceneWire {
+            connection: w.connection,
+            from_node: w.from_node,
+            from_pin: w.from_pin,
+            to_node: w.to_node,
+            to_pin: w.to_pin,
+            style: w.style.clone(),
+            shape: shape.clone(),
+            extra_shapes: extra_shapes.clone(),
+        }
+        .bounds()
+        .expand(4.0);
         self.wires[wi].shape = shape;
+        self.wires[wi].extra_shapes = extra_shapes;
         bounds
     }
 
-    /// Where wire `wi` passes a zip tie clamp, if it is in one (wobble read
-    /// straight off the tie).
-    fn tied_through(&self, wi: usize) -> Option<Vec2> {
-        self.ties.iter().find_map(|t| {
-            t.members
-                .iter()
-                .position(|&m| m == wi)
-                .map(|i| t.pass_point(i))
-        })
+    /// Tie pass points in wire order. Nearby ties shorten their straight
+    /// sections so the transitions do not overlap.
+    fn ties_for_wire(&self, wi: usize, from: Vec2, to: Vec2) -> Vec<(Vec2, f32)> {
+        let flow = unit(to - from);
+        let length = (to - from).length();
+        if length <= 1e-3 {
+            return Vec::new();
+        }
+        let mut ties: Vec<(f32, Vec2, f32)> = self
+            .ties
+            .iter()
+            .filter_map(|tie| {
+                let slot = tie.members.iter().position(|&member| member == wi)?;
+                let point = tie.pass_point(slot);
+                let offset = point - from;
+                Some((offset.x * flow.x + offset.y * flow.y, point, tie.straight_length.max(0.0)))
+            })
+            .collect();
+        ties.sort_by(|a, b| a.0.total_cmp(&b.0));
+        ties.iter()
+            .enumerate()
+            .map(|(i, (along, point, requested))| {
+                let before = if i == 0 { *along } else { *along - ties[i - 1].0 };
+                let after = if i + 1 == ties.len() {
+                    length - *along
+                } else {
+                    ties[i + 1].0 - *along
+                };
+                let allowed = before.min(after).max(0.0) * 0.9;
+                (*point, (*requested).min(allowed))
+            })
+            .collect()
     }
 
     /// Resolves the document's zip ties to live wire indices (stale edges are
@@ -404,6 +509,7 @@ impl Scene {
                 };
                 let t = SceneTie {
                     position,
+                    straight_length: doc_tie.straight_length as f32,
                     axis,
                     members: members.clone(),
                     wobble_left: 0.0,
@@ -415,6 +521,7 @@ impl Scene {
             }
             self.ties.push(SceneTie {
                 position,
+                straight_length: doc_tie.straight_length as f32,
                 axis,
                 members,
                 wobble_left: 0.0,
@@ -446,7 +553,7 @@ impl Scene {
         self.nodes[index].pos = pos;
         self.spatial.nodes.update(old, self.nodes[index].rect());
         for wi in self.adjacency[index].clone() {
-            let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
+            let old_bounds = self.wires[wi].bounds().expand(4.0);
             let new_bounds = self.reshape_wire(wi);
             self.spatial.wires.update(
                 Entry {
@@ -476,7 +583,7 @@ impl Scene {
         };
         self.ties[index].position = pos;
         for &wi in self.ties[index].members.clone().iter() {
-            let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
+            let old_bounds = self.wires[wi].bounds().expand(4.0);
             let new_bounds = self.reshape_wire(wi);
             self.spatial.wires.update(
                 Entry {
@@ -522,7 +629,7 @@ impl Scene {
     /// the wire index entries.
     fn reshuffle_tie(&mut self, ti: usize) {
         for &wi in self.ties[ti].members.clone().iter() {
-            let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
+            let old_bounds = self.wires[wi].bounds().expand(4.0);
             let new_bounds = self.reshape_wire(wi);
             self.spatial.wires.update(
                 Entry {
@@ -587,6 +694,7 @@ impl Scene {
                 GraphChange::ZipTieMoved { .. } | GraphChange::ZipTieRemoved { .. } => {
                     wires_dirty = true
                 }
+                GraphChange::ZipTieStraightLengthChanged { .. } => wires_dirty = true,
                 GraphChange::PropertySet { node, .. } => {
                     self.refresh_node(graph, node, presenter, measure)
                 }
@@ -647,7 +755,7 @@ impl Scene {
         }
         self.spatial.nodes.update(old, self.nodes[i].rect());
         for wi in self.adjacency.get(i).cloned().unwrap_or_default() {
-            let old_bounds = self.wires[wi].shape.bounds().expand(4.0);
+            let old_bounds = self.wires[wi].bounds().expand(4.0);
             let new_bounds = self.reshape_wire(wi);
             self.spatial.wires.update(
                 Entry {

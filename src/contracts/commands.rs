@@ -80,6 +80,11 @@ pub enum GraphCommand {
         x: f64,
         y: f64,
     },
+    /// Sets the straight-through length of a zip tie, in graph units.
+    SetZipTieStraightLength {
+        index: usize,
+        length: f64,
+    },
     /// Removes the zip tie at `index` (its wires stay connected).
     RemoveZipTie {
         index: usize,
@@ -153,6 +158,11 @@ pub enum GraphChange {
         index: usize,
         from: (f64, f64),
         to: (f64, f64),
+    },
+    ZipTieStraightLengthChanged {
+        index: usize,
+        from: f64,
+        to: f64,
     },
     ZipTieRemoved {
         index: usize,
@@ -424,6 +434,23 @@ impl GraphCommand {
                     to: (*x, *y),
                 }
             }
+            GraphCommand::SetZipTieStraightLength { index, length } => {
+                let t = graph
+                    .zip_ties
+                    .get_mut(*index)
+                    .ok_or(EditError::NoSuchZipTie(*index))?;
+                let from = t.straight_length;
+                t.straight_length = if length.is_finite() {
+                    length.clamp(0.0, 2000.0)
+                } else {
+                    80.0
+                };
+                GraphChange::ZipTieStraightLengthChanged {
+                    index: *index,
+                    from,
+                    to: t.straight_length,
+                }
+            }
             GraphCommand::RemoveZipTie { index } => {
                 if *index >= graph.zip_ties.len() {
                     return Err(EditError::NoSuchZipTie(*index));
@@ -598,6 +625,11 @@ impl ChangeSet {
                         };
                     }
                 }
+                GraphChange::ZipTieStraightLengthChanged { index, from, .. } => {
+                    if let Some(t) = graph.zip_ties.get_mut(*index) {
+                        t.straight_length = *from;
+                    }
+                }
                 GraphChange::ZipTieRemoved { index, tie } => {
                     graph
                         .zip_ties
@@ -634,6 +666,7 @@ impl ChangeSet {
                 | GraphChange::CommentEdited { .. } => {}
                 GraphChange::ZipTieAdded { .. }
                 | GraphChange::ZipTieMoved { .. }
+                | GraphChange::ZipTieStraightLengthChanged { .. }
                 | GraphChange::ZipTieRemoved { .. } => {}
                 GraphChange::ConnectionAdded(c) => {
                     add(&c.source_node);

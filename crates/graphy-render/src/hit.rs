@@ -170,7 +170,7 @@ impl Scene {
             .wires
             .query(Rect::around(p, radius), true)
             .into_iter()
-            .map(|wi| (wi, self.wires[wi].shape.distance_to(p)))
+            .map(|wi| (wi, self.wires[wi].distance_to(p)))
             .filter(|(_, d)| *d <= radius)
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(wi, _)| wi)

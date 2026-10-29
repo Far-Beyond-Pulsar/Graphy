@@ -1169,24 +1169,17 @@ impl Controller {
                         .wires
                         .iter()
                         .filter_map(|wire| {
-                            let points = wire.shape.flatten(48);
-                            let crossed = points.windows(2).any(|pair| {
-                                segments_distance(start, g, pair[0], pair[1])
-                                    <= self.tolerance().tie_px / self.view.zoom
+                            let crossed = wire.shapes().any(|shape| {
+                                shape.flatten(48).windows(2).any(|pair| {
+                                    segments_distance(start, g, pair[0], pair[1])
+                                        <= self.tolerance().tie_px / self.view.zoom
+                                })
                             });
                             if !crossed {
                                 return None;
                             }
                             let connection = cx.graph.connections.get(wire.connection)?;
                             let edge = graphy::ZipTieEdge::of(connection);
-                            if cx
-                                .graph
-                                .zip_ties
-                                .iter()
-                                .any(|tie| tie.wires.iter().any(|member| member == &edge))
-                            {
-                                return None;
-                            }
                             let a = cx.scene.nodes[wire.from_node]
                                 .pin_pos(PinSide::Output, wire.from_pin)?;
                             let b = cx.scene.nodes[wire.to_node]
@@ -1209,6 +1202,7 @@ impl Controller {
                                             x: tie_center.x as f64,
                                             y: tie_center.y as f64,
                                     },
+                                    straight_length: graphy::DEFAULT_ZIP_TIE_STRAIGHT_LENGTH,
                                     wires: wires.into_iter().map(|(_, edge)| edge).collect(),
                                 },
                             }],

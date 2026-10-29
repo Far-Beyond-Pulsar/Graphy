@@ -225,7 +225,13 @@ pub struct GraphDescription {
 pub struct BlueprintZipTie {
     #[serde(with = "tuple_or_object_f32_pair")]
     pub position: (f32, f32),
+    #[serde(default = "default_zip_tie_straight_length")]
+    pub straight_length: f32,
     pub wires: Vec<BlueprintZipTieEdge>,
+}
+
+fn default_zip_tie_straight_length() -> f32 {
+    80.0
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

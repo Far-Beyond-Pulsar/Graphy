@@ -139,13 +139,23 @@ impl ZipTieEdge {
 pub struct GraphZipTie {
     /// Where the tie sits, graph units.
     pub position: super::Position,
+    /// Length of the straight wire section through the tie, graph units.
+    #[serde(default = "default_zip_tie_straight_length")]
+    pub straight_length: f64,
     /// The bundled wires, in the order they were tied (slots follow it).
     pub wires: Vec<ZipTieEdge>,
+}
+
+pub const DEFAULT_ZIP_TIE_STRAIGHT_LENGTH: f64 = 80.0;
+
+fn default_zip_tie_straight_length() -> f64 {
+    DEFAULT_ZIP_TIE_STRAIGHT_LENGTH
 }
 
 impl PartialEq for GraphZipTie {
     fn eq(&self, other: &Self) -> bool {
         (self.position.x, self.position.y) == (other.position.x, other.position.y)
+            && self.straight_length == other.straight_length
             && self.wires == other.wires
     }
 }
