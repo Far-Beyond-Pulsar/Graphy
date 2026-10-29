@@ -31,6 +31,20 @@ fn datatype_out(dt: &DataType) -> authored::DataType {
     }
 }
 
+/// One authored node as the editing document holds it (a palette creates nodes
+/// in the authored form, so a canvas profile converts them with this).
+pub fn node_from_authored(node: &authored::NodeInstance) -> NodeInstance {
+    let mut out = NodeInstance::new(&node.id, &node.node_type, Position::new(f64::from(node.position.x), f64::from(node.position.y)));
+    out.properties = node.properties.clone();
+    let pin = |p: &authored::PinInstance, kind: PinType| PinInstance {
+        id: p.id.clone(),
+        pin: Pin { id: p.id.clone(), name: p.pin.name.clone(), data_type: datatype_in(&p.pin.data_type), pin_type: kind },
+    };
+    out.inputs = node.inputs.iter().map(|p| pin(p, PinType::Input)).collect();
+    out.outputs = node.outputs.iter().map(|p| pin(p, PinType::Output)).collect();
+    out
+}
+
 /// The editing document for an authored graph.
 pub fn from_authored(graph: &authored::GraphDescription) -> GraphDescription {
     let mut doc = GraphDescription::new(&graph.metadata.name);
@@ -40,15 +54,7 @@ pub fn from_authored(graph: &authored::GraphDescription) -> GraphDescription {
     doc.metadata.modified_at = graph.metadata.modified_at.clone();
 
     for (key, node) in &graph.nodes {
-        let mut out = NodeInstance::new(&node.id, &node.node_type, Position::new(f64::from(node.position.x), f64::from(node.position.y)));
-        out.properties = node.properties.clone();
-        let pin = |p: &authored::PinInstance, kind: PinType| PinInstance {
-            id: p.id.clone(),
-            pin: Pin { id: p.id.clone(), name: p.pin.name.clone(), data_type: datatype_in(&p.pin.data_type), pin_type: kind },
-        };
-        out.inputs = node.inputs.iter().map(|p| pin(p, PinType::Input)).collect();
-        out.outputs = node.outputs.iter().map(|p| pin(p, PinType::Output)).collect();
-        doc.nodes.insert(key.clone(), out);
+        doc.nodes.insert(key.clone(), node_from_authored(node));
     }
 
     doc.connections = graph
