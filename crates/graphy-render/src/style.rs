@@ -46,8 +46,8 @@ impl Theme {
             grid_minor: rgba(0xff, 0xff, 0xff, 0.10),
             grid_major: rgba(0xff, 0xff, 0xff, 0.19),
 
-            card_body: rgba(0x22, 0x22, 0x22, 1.0),
-            card_header: rgba(0x2c, 0x2c, 0x2c, 1.0),
+            card_body: rgba(0x0a, 0x0a, 0x0a, 1.0),
+            card_header: rgba(0x1c, 0x1c, 0x1c, 1.0),
             card_border: rgba(0x4a, 0x4a, 0x4e, 1.0),
             card_border_hover: rgba(0x73, 0x73, 0x78, 1.0),
             shadow: rgba(0x00, 0x00, 0x00, 0.55),
@@ -167,8 +167,8 @@ impl Theme {
         let canvas = with_alpha(c.canvas, 1.0);
         let fg = with_alpha(c.foreground, 1.0);
         let dark = relative_luminance(background) < 0.4;
-        let card_body = mix(canvas, fg, 0.05);
-        let card_header = mix(canvas, fg, 0.10);
+        let card_body = background;
+        let card_header = mix(background, fg, 0.08);
         let surfaces = [canvas, background, card_body, card_header];
         let (grid_minor, grid_major) = if dark { (0.10, 0.19) } else { (0.07, 0.14) };
         let accent = with_alpha(c.accent, 1.0);
@@ -179,8 +179,8 @@ impl Theme {
 
             card_body,
             card_header,
-            card_border: mix(canvas, fg, 0.36),
-            card_border_hover: mix(canvas, fg, 0.52),
+            card_border: mix(background, fg, 0.36),
+            card_border_hover: mix(background, fg, 0.52),
             shadow: [0.0, 0.0, 0.0, if dark { 0.55 } else { 0.25 }],
 
             select: fg,
@@ -255,7 +255,7 @@ mod tests {
             let over = |line: Color| mix(t.canvas, with_alpha(line, 1.0), line[3]);
             assert!(contrast_ratio(over(t.grid_minor), t.canvas) > 1.03, "{name}: minor grid");
             assert!(contrast_ratio(over(t.grid_major), t.canvas) > contrast_ratio(over(t.grid_minor), t.canvas), "{name}: major > minor");
-            assert!(contrast_ratio(t.card_header, t.canvas) > 1.05, "{name}: header chip");
+            assert!(contrast_ratio(t.card_header, t.card_body) > 1.05, "{name}: header chip");
             assert!(contrast_ratio(t.card_border, t.card_body) > 1.5, "{name}: border");
         }
     }

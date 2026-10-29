@@ -660,7 +660,7 @@ impl Scene {
                             text: fit_text(measure, label, m.label_font, max_w.max(0.0)),
                             pos: Vec2::new(rr.min.x + edge, rr.center().y),
                             size: m.label_font,
-                            color: text_color(theme.text_dim),
+                            color: text_color(theme.text),
                             align: TextAlign::Left,
                             bold: false,
                         });
@@ -676,7 +676,7 @@ impl Scene {
                             text: fit_text(measure, label, m.label_font, max_w.max(0.0)),
                             pos: Vec2::new(rr.max.x - edge, rr.center().y),
                             size: m.label_font,
-                            color: text_color(theme.text_dim),
+                            color: text_color(theme.text),
                             align: TextAlign::Right,
                             bold: false,
                         });
