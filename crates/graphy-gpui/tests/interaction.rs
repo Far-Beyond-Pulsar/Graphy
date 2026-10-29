@@ -881,3 +881,67 @@ fn dynamic_pins_become_a_set_pins_command_that_drops_stale_wires() {
     assert_eq!(graph.nodes["f"].inputs.len(), 2);
     assert_eq!(graph.connections.len(), 1);
 }
+
+/// A profile whose pin ids follow a property and that moves the wires with them.
+struct RenamingProfile {
+    presenter: SamplePresenter,
+}
+
+impl GraphProfile for RenamingProfile {
+    fn id(&self) -> &str {
+        "renaming"
+    }
+
+    fn presenter(&self) -> &dyn Presenter {
+        &self.presenter
+    }
+
+    fn pin_commands(&self, graph: &GraphDescription, node: &str) -> Vec<graphy::GraphCommand> {
+        let Some(n) = graph.nodes.get(node) else {
+            return Vec::new();
+        };
+        let Some(name) = n.properties.get("name").and_then(|v| v.as_str()) else {
+            return Vec::new();
+        };
+        let old = n.outputs[0].id.clone();
+        if old == name {
+            return Vec::new();
+        }
+        let mut moved = graph.connections[0].clone();
+        moved.source_pin = name.to_string();
+        let mut renamed = graphy::NodeInstance::new(node, &n.node_type, n.position);
+        renamed.add_output_pin(name, graphy::DataType::typed("f32"));
+        vec![
+            graphy::GraphCommand::Disconnect(graph.connections[0].clone()),
+            graphy::GraphCommand::SetPins {
+                node: node.to_string(),
+                inputs: n.inputs.clone(),
+                outputs: renamed.outputs,
+            },
+            graphy::GraphCommand::Connect(moved),
+        ]
+    }
+}
+
+#[test]
+fn a_profile_can_re_home_wires_when_its_pin_ids_change() {
+    let mut graph = GraphDescription::new("r");
+    let mut b = graphy::NodeInstance::new("b", "res", graphy::Position::new(0.0, 0.0));
+    b.add_output_pin("old", graphy::DataType::typed("f32"));
+    b.set_property("name", "new");
+    let mut t = graphy::NodeInstance::new("t", "take", graphy::Position::new(200.0, 0.0));
+    t.add_input_pin("x", graphy::DataType::typed("f32"));
+    graph.add_node(b);
+    graph.add_node(t);
+    graph.add_connection(Connection::data("b", "old", "t", "x"));
+
+    let profile = RenamingProfile {
+        presenter: SamplePresenter,
+    };
+    let commands = graphy_gpui::dynamic_pin_commands(&profile, &graph, "b");
+    assert_eq!(commands.len(), 3);
+    apply_transaction(&mut graph, &commands).unwrap();
+    assert_eq!(graph.nodes["b"].outputs[0].id, "new");
+    assert_eq!(graph.connections.len(), 1, "the wire follows the pin");
+    assert_eq!(graph.connections[0].source_pin, "new");
+}
