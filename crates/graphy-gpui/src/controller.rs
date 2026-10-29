@@ -116,8 +116,14 @@ pub enum Action {
     ConnectionDropped {
         from: PinRef,
         side: PinSide,
+        /// Pointer position, canvas-relative pixels (as in [`Action::ContextMenu`]).
         at: Vec2,
+        /// The same point in graph space, where a new node would go.
+        graph_at: Vec2,
     },
+    /// A domain menu item the profile left to the host (its id and the target
+    /// it was chosen on).
+    Custom { id: String, target: MenuTarget },
     /// The drag target refused the connection.
     ConnectionRefused(String),
     /// Put this text on the system clipboard.
@@ -1090,7 +1096,7 @@ impl Controller {
                 replacing,
                 snapped,
             } => {
-                self.finish_connect(anchor, replacing, snapped, g, cx, out);
+                self.finish_connect(anchor, replacing, snapped, pos, g, cx, out);
                 self.compatible.clear();
             }
         }
@@ -1101,6 +1107,7 @@ impl Controller {
         anchor: PinAddr,
         replacing: Option<(usize, Connection)>,
         snapped: Option<PinAddr>,
+        pos: Vec2,
         g: Vec2,
         cx: &mut GraphCtx,
         out: &mut Outcome,
@@ -1188,7 +1195,8 @@ impl Controller {
                 out.actions.push(Action::ConnectionDropped {
                     from: anchor_ref,
                     side: anchor.side,
-                    at: g,
+                    at: pos,
+                    graph_at: g,
                 });
             }
         }

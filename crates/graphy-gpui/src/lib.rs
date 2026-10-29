@@ -15,6 +15,7 @@
 //!
 //! Without the `gpui` feature nothing here links GPUI or WGPU.
 
+pub mod catalog;
 pub mod clipboard;
 pub mod controller;
 pub mod input;
@@ -23,12 +24,14 @@ pub mod snap;
 
 #[cfg(feature = "gpui")]
 pub mod canvas;
+#[cfg(feature = "gpui")]
+pub mod picker;
 
 pub use controller::{
     apply_transaction, Action, Controller, GraphCtx, InteractionSettings, Outcome, Selection,
 };
 pub use input::{CursorHint, InputEvent, Key, Modifiers, MouseButton};
 pub use profile::{
-    default_can_connect, dynamic_pin_commands, CatalogEntry, GraphProfile, MacroTarget, MenuItem,
+    connect_new_node_commands, default_can_connect, dynamic_pin_commands, CatalogEntry, DragMatch, GraphProfile, MacroTarget, MenuItem,
     MenuTarget, PinUpdate,
 };

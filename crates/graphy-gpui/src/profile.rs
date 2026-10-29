@@ -18,14 +18,33 @@ use graphy::{
 };
 use graphy_render::{DrawData, Presenter, Scene, Vec2};
 
-/// One addable node type, for palettes and the "add node" menu.
-#[derive(Clone, Debug, PartialEq)]
+/// One addable node type, for the node picker.
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct CatalogEntry {
     /// Domain-defined id passed back to [`GraphProfile::create_node`].
     pub definition: String,
     pub title: String,
     pub category: String,
     pub keywords: Vec<String>,
+    /// One line shown under the title.
+    pub description: String,
+    /// Glyph shown in the entry's badge (may be empty).
+    pub icon: String,
+    /// Accent of the entry and its category (display-space RGBA); the picker
+    /// falls back to the theme's focus colour.
+    pub color: Option<graphy_render::Color>,
+    /// Types of the entry's input pins, for filtering by a dragged wire. `None`
+    /// asks the profile to build a probe node with [`GraphProfile::create_node`].
+    pub inputs: Option<Vec<DataType>>,
+}
+
+/// How a catalogue entry can take a dragged wire.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DragMatch {
+    /// An input that takes the type directly.
+    Exact,
+    /// Only a wildcard input accepts it; listed after the exact ones.
+    Wildcard,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -118,6 +137,32 @@ pub trait GraphProfile {
 
     fn catalog(&self) -> Vec<CatalogEntry> {
         Vec::new()
+    }
+
+    /// Whether (and how) a catalogue entry takes a wire dragged from an output of
+    /// type `from`. The default asks the type resolver about the entry's input
+    /// pins (`entry.inputs`, or those of a probe node from [`Self::create_node`]).
+    fn drag_match(&self, entry: &CatalogEntry, from: &DataType) -> Option<DragMatch> {
+        let probe;
+        let inputs: Vec<&DataType> = match &entry.inputs {
+            Some(inputs) => inputs.iter().collect(),
+            None => {
+                probe = self.create_node(&entry.definition, "probe", Position::new(0.0, 0.0))?;
+                probe.inputs.iter().map(|p| p.data_type()).collect()
+            }
+        };
+        let resolver = self.type_resolver();
+        let mut best = None;
+        for to in inputs {
+            match resolver.compatibility(from, to) {
+                graphy::Compatibility::Exact | graphy::Compatibility::Convertible { .. } => {
+                    return Some(DragMatch::Exact)
+                }
+                graphy::Compatibility::Wildcard => best = Some(DragMatch::Wildcard),
+                _ => {}
+            }
+        }
+        best
     }
 
     /// Builds a node of a catalogue type at `pos` with the given id.
@@ -260,4 +305,54 @@ fn set_pins_commands(
         inputs: update.inputs,
         outputs: update.outputs,
     }]
+}
+
+/// Commands wiring `source` (an output pin) to the first compatible input of the
+/// freshly added `node`. An execution output (or a reroute's) drives one wire, so
+/// its existing wire is replaced.
+pub fn connect_new_node_commands(
+    profile: &dyn GraphProfile,
+    graph: &GraphDescription,
+    source: &PinRef,
+    node: &NodeInstance,
+) -> Vec<graphy::GraphCommand> {
+    use graphy::GraphCommand;
+    let Some(src_node) = graph.nodes.get(&source.node) else {
+        return Vec::new();
+    };
+    let Some(src_pin) = src_node.outputs.iter().find(|p| p.id == source.pin) else {
+        return Vec::new();
+    };
+    let resolver = profile.type_resolver();
+    let Some(target) = node.inputs.iter().find(|p| {
+        resolver
+            .compatibility(src_pin.data_type(), p.data_type())
+            .is_connectable()
+    }) else {
+        return Vec::new();
+    };
+    let exec = src_pin.data_type().is_execution();
+    let mut commands = Vec::new();
+    if exec || src_node.is_reroute() {
+        commands.extend(
+            graph
+                .connections
+                .iter()
+                .filter(|c| c.source_node == source.node && c.source_pin == source.pin)
+                .cloned()
+                .map(GraphCommand::Disconnect),
+        );
+    }
+    commands.push(GraphCommand::Connect(Connection::new(
+        &source.node,
+        &source.pin,
+        &node.id,
+        &target.id,
+        if exec {
+            ConnectionType::Execution
+        } else {
+            ConnectionType::Data
+        },
+    )));
+    commands
 }

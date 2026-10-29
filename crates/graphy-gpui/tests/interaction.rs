@@ -945,3 +945,28 @@ fn a_profile_can_re_home_wires_when_its_pin_ids_change() {
     assert_eq!(graph.connections.len(), 1, "the wire follows the pin");
     assert_eq!(graph.connections[0].source_pin, "new");
 }
+
+/// The picker opens where the wire was dropped: `at` is the pointer in canvas
+/// pixels (what a popup is placed with) and `graph_at` the same point in graph
+/// space (where the node goes). Zoomed and panned, the two differ.
+#[test]
+fn dropped_connection_reports_the_pointer_and_its_graph_position() {
+    let mut r = Rig::new();
+    r.ctl.view.zoom = 1.6;
+    r.ctl.view.pan = Vec2::new(-35.0, 20.0);
+    let drop = Vec2::new(1400.0, 800.0);
+    let out_pin = r.pin_screen("speed", PinSide::Output, 0);
+    let out = r.drag(out_pin, drop, NONE);
+    let (at, graph_at) = out
+        .actions
+        .iter()
+        .find_map(|a| match a {
+            Action::ConnectionDropped { at, graph_at, .. } => Some((*at, *graph_at)),
+            _ => None,
+        })
+        .expect("a drop on empty canvas is reported");
+    assert_eq!(at, drop, "pointer position, not graph space");
+    let expected = r.ctl.view.screen_to_graph(drop);
+    assert!((graph_at.x - expected.x).abs() < 1e-3 && (graph_at.y - expected.y).abs() < 1e-3);
+    assert_ne!(at, graph_at);
+}
