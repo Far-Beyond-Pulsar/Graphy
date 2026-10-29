@@ -229,6 +229,13 @@ impl GraphCanvas {
         cx.notify();
     }
 
+    /// Frames the whole document, for a document that carries no saved view.
+    pub fn frame_all(&mut self, cx: &mut Context<Self>) {
+        self.controller.frame_all(&self.scene);
+        cx.emit(CanvasEvent::ViewChanged);
+        cx.notify();
+    }
+
     /// Centres the view on a node. Returns whether the node exists.
     pub fn center_on(&mut self, node: &str, cx: &mut Context<Self>) -> bool {
         let Some(n) = self.scene.node(node) else {
