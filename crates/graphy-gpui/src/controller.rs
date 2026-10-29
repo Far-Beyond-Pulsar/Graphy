@@ -10,7 +10,7 @@
 //! All hit testing goes through [`graphy_render::Scene`], i.e. the same layout
 //! the renderer draws from.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use graphy::{Connection, ConnectionType, GraphCommand, GraphDescription, PinRef, Position};
 use graphy_render::{
@@ -1275,6 +1275,15 @@ impl Controller {
                     out.actions.push(Action::ViewChanged);
                 }
             }
+            (Key::Char('q'), false) => {
+                let cmds = self.straighten_commands(cx);
+                if !cmds.is_empty() {
+                    out.actions.push(Action::Commands {
+                        label: "Straighten",
+                        commands: cmds,
+                    });
+                }
+            }
             (Key::Home, _) => {
                 if self.frame_all(cx.scene) {
                     out.actions.push(Action::ViewChanged);
@@ -1383,6 +1392,72 @@ impl Controller {
                 .map(|&index| GraphCommand::RemoveComment { index }),
         );
         cmds
+    }
+
+    /// Q: move every selected node so its touching wires run level between the
+    /// two pins. One wire fixes the node's vertical offset exactly; with
+    /// several wires the offsets disagree (each pin sits at its own height),
+    /// so they are averaged and the node ends up centred between its
+    /// connections. Columns are left where they are: only Y moves, and wires
+    /// between two selected nodes are skipped (neither end can be the anchor).
+    fn straighten_commands(&self, cx: &GraphCtx) -> Vec<GraphCommand> {
+        let selected: HashSet<usize> = self
+            .selection
+            .nodes
+            .iter()
+            .filter_map(|id| cx.scene.node_index(id))
+            .collect();
+        if selected.is_empty() {
+            return Vec::new();
+        }
+        let mut offsets: HashMap<usize, (f32, u32)> = HashMap::new();
+        for w in &cx.scene.wires {
+            for (mover, m_side, m_pin, other, o_side, o_pin) in [
+                (
+                    w.from_node,
+                    PinSide::Output,
+                    w.from_pin,
+                    w.to_node,
+                    PinSide::Input,
+                    w.to_pin,
+                ),
+                (
+                    w.to_node,
+                    PinSide::Input,
+                    w.to_pin,
+                    w.from_node,
+                    PinSide::Output,
+                    w.from_pin,
+                ),
+            ] {
+                if !selected.contains(&mover) || selected.contains(&other) {
+                    continue;
+                }
+                let Some(mine) = cx.scene.nodes[mover].pin_pos(m_side, m_pin) else {
+                    continue;
+                };
+                let Some(theirs) = cx.scene.nodes[other].pin_pos(o_side, o_pin) else {
+                    continue;
+                };
+                let entry = offsets.entry(mover).or_insert((0.0, 0));
+                entry.0 += theirs.y - mine.y;
+                entry.1 += 1;
+            }
+        }
+        offsets
+            .into_iter()
+            .filter_map(|(i, (sum, count))| {
+                let dy = sum / count as f32;
+                (dy.abs() > f32::EPSILON).then(|| {
+                    let n = &cx.scene.nodes[i];
+                    GraphCommand::MoveNode {
+                        id: n.id.clone(),
+                        x: n.pos.x as f64,
+                        y: (n.pos.y + dy) as f64,
+                    }
+                })
+            })
+            .collect()
     }
 
     fn selection_origin(&self, cx: &GraphCtx) -> Vec2 {

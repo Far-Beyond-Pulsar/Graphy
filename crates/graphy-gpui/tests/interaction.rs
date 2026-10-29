@@ -763,6 +763,68 @@ fn arrow_keys_nudge_selection() {
     assert_eq!(r.scene.node("fmt").unwrap().pos, p + Vec2::new(10.0, 0.0));
 }
 
+/// Q levels the selected nodes between the pins their wires touch; with more
+/// than one wire the offset is their average.
+#[test]
+fn straighten_levels_selected_nodes_between_connected_pins() {
+    // a single-connection node lands exactly level with its far pin
+    let mut r = Rig::new();
+    r.click(r.screen("anim", Vec2::new(40.0, 8.0)), NONE);
+    let before = r.scene.node("anim").unwrap().pos;
+    let out = r.send(InputEvent::KeyDown {
+        key: Key::Char('q'),
+        mods: NONE,
+    });
+    let labels = r.apply(&out);
+    assert_eq!(labels, ["Straighten"]);
+    assert_eq!(r.scene.node("anim").unwrap().pos.x, before.x);
+    let from = r.scene.node("anim").unwrap().pin_pos(PinSide::Input, 0).unwrap();
+    let to = r.scene.node("print").unwrap().pin_pos(PinSide::Output, 0).unwrap();
+    assert_eq!(from.y, to.y);
+
+    // "branch" has four wires: begin.Then, gt.Result, print.Exec, off.Exec;
+    // the offset that levels one would skew another, so take the average
+    let mut r = Rig::new();
+    r.click(r.screen("branch", Vec2::new(40.0, 8.0)), NONE);
+    let bi = r.scene.node_index("branch").unwrap();
+    let sums: Vec<f32> = r
+        .scene
+        .wires
+        .iter()
+        .filter_map(|w| {
+            let (mi, ms, mp, oi, os, op) = if w.from_node == bi {
+                (bi, PinSide::Output, w.from_pin, w.to_node, PinSide::Input, w.to_pin)
+            } else if w.to_node == bi {
+                (bi, PinSide::Input, w.to_pin, w.from_node, PinSide::Output, w.from_pin)
+            } else {
+                return None;
+            };
+            let s = r.scene.nodes[mi].pin_pos(ms, mp).unwrap();
+            let o = r.scene.nodes[oi].pin_pos(os, op).unwrap();
+            Some(o.y - s.y)
+        })
+        .collect();
+    assert_eq!(sums.len(), 4);
+    let want = r.scene.node("branch").unwrap().pos;
+    let avg = sums.iter().sum::<f32>() / sums.len() as f32;
+    let out = r.send(InputEvent::KeyDown {
+        key: Key::Char('q'),
+        mods: NONE,
+    });
+    r.apply(&out);
+    let after = r.scene.node("branch").unwrap().pos;
+    assert_eq!(after.x, want.x);
+    assert!((after.y - (want.y + avg)).abs() < 1e-3);
+
+    // nothing selected does nothing
+    let mut r = Rig::new();
+    let out = r.send(InputEvent::KeyDown {
+        key: Key::Char('q'),
+        mods: NONE,
+    });
+    assert!(commands(&out).is_empty());
+}
+
 #[test]
 fn transaction_rolls_back_when_a_command_fails() {
     let mut r = Rig::new();
