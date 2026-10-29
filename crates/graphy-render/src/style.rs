@@ -48,8 +48,8 @@ impl Theme {
 
             card_body: rgba(0x17, 0x17, 0x17, 1.0),
             card_header: rgba(0x20, 0x20, 0x20, 1.0),
-            card_border: rgba(0x4a, 0x4a, 0x4e, 1.0),
-            card_border_hover: rgba(0x73, 0x73, 0x78, 1.0),
+            card_border: rgba(0x24, 0x24, 0x26, 1.0),
+            card_border_hover: rgba(0x34, 0x34, 0x37, 1.0),
             shadow: rgba(0x00, 0x00, 0x00, 0.55),
 
             select: rgba(0xe4, 0xe4, 0xe7, 1.0),
@@ -62,7 +62,7 @@ impl Theme {
             text_faint: rgba(0x73, 0x73, 0x73, 1.0),
 
             comment_fill: rgba(0xff, 0xff, 0xff, 0.030),
-            comment_border: rgba(0xff, 0xff, 0xff, 0.14),
+            comment_border: rgba(0xff, 0xff, 0xff, 0.06),
 
             preview_well: rgba(0x0b, 0x0b, 0x0b, 1.0),
 
@@ -179,8 +179,8 @@ impl Theme {
 
             card_body,
             card_header,
-            card_border: mix(canvas, fg, 0.36),
-            card_border_hover: mix(canvas, fg, 0.52),
+            card_border: mix(card_body, fg, 0.10),
+            card_border_hover: mix(card_body, fg, 0.20),
             shadow: [0.0, 0.0, 0.0, if dark { 0.55 } else { 0.25 }],
 
             select: fg,
@@ -193,7 +193,7 @@ impl Theme {
             text_faint: readable(mix(canvas, fg, 0.45), &surfaces, 3.0),
 
             comment_fill: with_alpha(fg, if dark { 0.03 } else { 0.05 }),
-            comment_border: with_alpha(fg, 0.14),
+            comment_border: with_alpha(fg, 0.06),
 
             preview_well: mix(canvas, [0.0, 0.0, 0.0, 1.0], if dark { 0.2 } else { 0.08 }),
 
@@ -256,7 +256,7 @@ mod tests {
             assert!(contrast_ratio(over(t.grid_minor), t.canvas) > 1.03, "{name}: minor grid");
             assert!(contrast_ratio(over(t.grid_major), t.canvas) > contrast_ratio(over(t.grid_minor), t.canvas), "{name}: major > minor");
             assert!(contrast_ratio(t.card_header, t.card_body) > 1.05, "{name}: header chip");
-            assert!(contrast_ratio(t.card_border, t.card_body) > 1.5, "{name}: border");
+            assert!(contrast_ratio(t.card_border, t.card_body) > 1.03, "{name}: border");
         }
     }
 
