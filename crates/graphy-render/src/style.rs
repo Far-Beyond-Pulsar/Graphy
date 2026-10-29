@@ -46,8 +46,8 @@ impl Theme {
             grid_minor: rgba(0xff, 0xff, 0xff, 0.075),
             grid_major: rgba(0xff, 0xff, 0xff, 0.140),
 
-            card_body: rgba(0x1b, 0x1b, 0x1b, 1.0),
-            card_header: rgba(0x26, 0x26, 0x26, 1.0),
+            card_body: rgba(0x17, 0x17, 0x17, 1.0),
+            card_header: rgba(0x20, 0x20, 0x20, 1.0),
             card_border: rgba(0x4a, 0x4a, 0x4e, 1.0),
             card_border_hover: rgba(0x73, 0x73, 0x78, 1.0),
             shadow: rgba(0x00, 0x00, 0x00, 0.55),
@@ -170,8 +170,8 @@ impl Theme {
         } else {
             background
         };
-        let card_body = mix(canvas, fg, if dark { 0.065 } else { 0.05 });
-        let card_header = mix(canvas, fg, if dark { 0.12 } else { 0.10 });
+        let card_body = mix(canvas, fg, 0.05);
+        let card_header = mix(canvas, fg, 0.10);
         let surfaces = [canvas, card_body, card_header];
         let (grid_minor, grid_major) = if dark { (0.075, 0.14) } else { (0.07, 0.14) };
         let accent = with_alpha(c.accent, 1.0);
