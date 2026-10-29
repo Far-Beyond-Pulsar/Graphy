@@ -64,6 +64,7 @@
 //! - Add custom analysis passes with `AnalysisPass`
 
 pub mod analysis;
+pub mod authored;
 pub mod contracts;
 pub mod core;
 pub mod diagnostics;
