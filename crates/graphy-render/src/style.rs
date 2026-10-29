@@ -43,8 +43,8 @@ impl Theme {
     pub fn dark() -> Theme {
         Theme {
             canvas: rgba(0x0f, 0x0f, 0x0f, 1.0),
-            grid_minor: rgba(0xff, 0xff, 0xff, 0.075),
-            grid_major: rgba(0xff, 0xff, 0xff, 0.140),
+            grid_minor: rgba(0xff, 0xff, 0xff, 0.10),
+            grid_major: rgba(0xff, 0xff, 0xff, 0.19),
 
             card_body: rgba(0x17, 0x17, 0x17, 1.0),
             card_header: rgba(0x20, 0x20, 0x20, 1.0),
@@ -173,7 +173,7 @@ impl Theme {
         let card_body = mix(canvas, fg, 0.05);
         let card_header = mix(canvas, fg, 0.10);
         let surfaces = [canvas, card_body, card_header];
-        let (grid_minor, grid_major) = if dark { (0.075, 0.14) } else { (0.07, 0.14) };
+        let (grid_minor, grid_major) = if dark { (0.10, 0.19) } else { (0.07, 0.14) };
         let accent = with_alpha(c.accent, 1.0);
         Theme {
             canvas,
