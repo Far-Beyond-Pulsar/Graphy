@@ -19,20 +19,24 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui::{
-    div, px, wgpu_surface, AnyElement, App, AppContext, ClipboardItem, Context, CursorStyle, ElementGeometry,
+    anchored, deferred, div, px, wgpu_surface, AnyElement, App, AppContext, ClipboardItem, Context, CursorStyle, ElementGeometry,
     Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton as GpuiButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
     Point, Render, ScrollDelta, ScrollWheelEvent, SharedString, Styled,
     Subscription, WeakEntity, WgpuSurfaceHandle, Window,
 };
+use ui::ActiveTheme;
 use graphy::{ChangeSet, EditError, GraphCommand, GraphDescription, PinRef};
 use graphy_render::{DrawParams, LayoutMetrics, LodTier, PinSide, Scene, Theme, Vec2};
 use graphy_render_wgpu::{FontMeasure, FontSet, Fonts, GraphRenderer};
 
 use crate::controller::{apply_transaction, Action, Controller, GraphCtx, Outcome};
 use crate::input::{CursorHint, InputEvent, Key, Modifiers, MouseButton};
-use crate::picker::{hsla, DragChip, NodePicker, PickerEvent, MENU_ROW_H, MENU_WIDTH, PICKER_SIZE};
-use crate::profile::{GraphProfile, MenuItem, MenuTarget};
+use crate::picker::{DragChip, NodePicker, PickerEvent, PICKER_SIZE};
+use crate::profile::{CatalogEntry, GraphProfile, MenuItem, MenuTarget};
+
+/// Width of a context menu.
+const MENU_WIDTH: f32 = 220.0;
 
 /// A [`GraphProfile`] that can also contribute GPUI content. Implement it
 /// (usually with an empty body) for any profile used with [`GraphCanvas`].
@@ -97,10 +101,55 @@ enum Overlay {
         at: Vec2,
         graph_pos: Vec2,
         source: Option<PinRef>,
-        view: Entity<NodePicker>,
+        /// Entries to build the picker from; taken once a window is at hand.
+        init: Option<(Vec<CatalogEntry>, Option<DragChip>)>,
+        view: Option<Entity<NodePicker>>,
         focus_pending: bool,
-        _subscription: Subscription,
+        subscription: Option<Subscription>,
     },
+}
+
+/// One context-menu row (children follow it, indented).
+fn menu_entry(
+    (item, depth): (MenuItem, usize),
+    canvas: &Entity<GraphCanvas>,
+    cx: &mut Context<GraphCanvas>,
+) -> Vec<AnyElement> {
+    let mut out: Vec<AnyElement> = Vec::new();
+    if item.separator_before {
+        out.push(
+            div()
+                .my(px(4.0))
+                .mx(px(8.0))
+                .h(px(1.0))
+                .bg(cx.theme().border)
+                .into_any_element(),
+        );
+    }
+    let foreground = if item.enabled {
+        cx.theme().popover_foreground
+    } else {
+        cx.theme().muted_foreground
+    };
+    let id = item.id.clone();
+    let mut row = div()
+        .pl(px(12.0 + depth as f32 * 12.0))
+        .pr(px(12.0))
+        .py(px(6.0))
+        .text_sm()
+        .text_color(foreground)
+        .child(SharedString::from(item.label.clone()));
+    if item.enabled {
+        let canvas = canvas.clone();
+        row = row
+            .cursor_pointer()
+            .hover(|s| s.bg(cx.theme().accent.opacity(0.12)))
+            .on_mouse_down(GpuiButton::Left, move |_, _, cx| {
+                canvas.update(cx, |c, cx| c.choose_menu_item(&id, cx));
+            });
+    }
+    out.push(row.into_any_element());
+    out
 }
 
 pub struct GraphCanvas {
@@ -225,12 +274,6 @@ impl GraphCanvas {
     pub fn set_theme(&mut self, theme: Theme, cx: &mut Context<Self>) {
         if self.theme == theme {
             return;
-        }
-        if let Some(Overlay::Picker { view, .. }) = &self.overlay {
-            view.update(cx, |picker, cx| {
-                picker.set_theme(theme.clone());
-                cx.notify();
-            });
         }
         self.theme = theme;
         cx.notify();
@@ -507,9 +550,38 @@ impl GraphCanvas {
                 });
             }
         }
-        let theme = self.theme.clone();
-        let view = cx.new(|cx| NodePicker::new(entries, chip, theme, cx));
-        let subscription = cx.subscribe(&view, |this, _, event: &PickerEvent, cx| {
+        self.overlay = Some(Overlay::Picker {
+            at,
+            graph_pos,
+            source,
+            init: Some((entries, chip)),
+            view: None,
+            focus_pending: true,
+            subscription: None,
+        });
+        cx.notify();
+    }
+
+    /// Runs a menu item of the open context menu, then closes it.
+    fn choose_menu_item(&mut self, id: &str, cx: &mut Context<Self>) {
+        let Some(Overlay::Menu { at, target, .. }) = self.overlay.take() else {
+            return;
+        };
+        self.run_menu_item(&target, id, at, cx);
+        cx.notify();
+    }
+
+    /// Builds the picker entity once a window is at hand (opening it from input
+    /// handling has none).
+    fn ensure_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(Overlay::Picker { init, .. }) = &mut self.overlay else {
+            return;
+        };
+        let Some((entries, chip)) = init.take() else {
+            return;
+        };
+        let picker = cx.new(|cx| NodePicker::new(entries, chip, window, cx));
+        let subscription = cx.subscribe(&picker, |this, _, event: &PickerEvent, cx| {
             let Some(Overlay::Picker {
                 graph_pos, source, ..
             }) = this.overlay.take()
@@ -525,124 +597,84 @@ impl GraphCanvas {
             }
             cx.notify();
         });
-        self.overlay = Some(Overlay::Picker {
-            at,
-            graph_pos,
-            source,
-            view,
-            focus_pending: true,
-            _subscription: subscription,
-        });
-        cx.notify();
+        if let Some(Overlay::Picker {
+            view: slot,
+            subscription: sub,
+            ..
+        }) = &mut self.overlay
+        {
+            *slot = Some(picker);
+            *sub = Some(subscription);
+        }
     }
 
-    /// Runs a menu item of the open context menu, then closes it.
-    fn choose_menu_item(&mut self, id: &str, cx: &mut Context<Self>) {
-        let Some(Overlay::Menu { at, target, .. }) = self.overlay.take() else {
-            return;
-        };
-        self.run_menu_item(&target, id, at, cx);
-        cx.notify();
-    }
-
-    /// The popup element, positioned inside the canvas and kept within it.
+    /// The popup element, anchored at the pointer and kept inside the window.
+    ///
+    /// `at` is canvas-relative (the space pointer events arrive in), so it is
+    /// mapped to window coordinates through the canvas's own origin: right-click
+    /// and wire-drop both land under the pointer whatever the pan, zoom, DPI or
+    /// the canvas's offset in the window.
     fn popup(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let theme = &self.theme;
-        let vp = self.controller.viewport;
-        let place = |at: Vec2, w: f32, h: f32| {
-            let x = at.x.min(vp.x - w - 8.0).max(8.0);
-            let y = at.y.min(vp.y - h - 8.0).max(8.0);
-            (px(x), px(y))
-        };
-        let shell = |x, y, w: f32, h: f32| {
-            div()
-                .absolute()
-                .left(x)
-                .top(y)
-                .w(px(w))
-                .h(px(h))
-                .occlude()
-                .bg(hsla(theme.card_body))
-                .border_1()
-                .border_color(hsla(theme.card_border))
-                .rounded(px(6.0))
-                .shadow_lg()
-                .overflow_hidden()
-                // Pointer input over a popup belongs to the popup, not the canvas.
-                .on_mouse_down(GpuiButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_mouse_down(GpuiButton::Right, |_, _, cx| cx.stop_propagation())
-                .on_mouse_down(GpuiButton::Middle, |_, _, cx| cx.stop_propagation())
-                .on_mouse_up(GpuiButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_mouse_up(GpuiButton::Right, |_, _, cx| cx.stop_propagation())
-                .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
+        let border = cx.theme().border;
+        let shell = |at: Vec2, priority: usize, body: gpui::Div| {
+            let position = self.local_to_window(at);
+            deferred(
+                anchored()
+                    .position(position)
+                    .snap_to_window_with_margin(px(8.0))
+                    .anchor(gpui::Corner::TopLeft)
+                    .child(
+                        body.occlude()
+                            .shadow_lg()
+                            .rounded(px(6.0))
+                            .border_1()
+                            .border_color(border)
+                            // Pointer input over a popup belongs to the popup, not the
+                            // canvas underneath.
+                            .on_mouse_down(GpuiButton::Left, |_, _, cx| cx.stop_propagation())
+                            .on_mouse_down(GpuiButton::Right, |_, _, cx| cx.stop_propagation())
+                            .on_mouse_down(GpuiButton::Middle, |_, _, cx| cx.stop_propagation())
+                            .on_mouse_up(GpuiButton::Left, |_, _, cx| cx.stop_propagation())
+                            .on_mouse_up(GpuiButton::Right, |_, _, cx| cx.stop_propagation())
+                            .on_scroll_wheel(|_, _, cx| cx.stop_propagation()),
+                    ),
+            )
+            .with_priority(priority)
+            .into_any_element()
         };
         match self.overlay.as_ref()? {
             Overlay::Menu { at, items, .. } => {
-                let rows = flatten_menu(items);
-                let separators = rows.iter().filter(|(i, _)| i.separator_before).count();
-                let h = rows.len() as f32 * MENU_ROW_H + 8.0 + separators as f32 * 9.0;
-                let (x, y) = place(*at, MENU_WIDTH, h);
                 let entity = cx.entity();
-                let mut list = shell(x, y, MENU_WIDTH, h).py(px(4.0));
-                let hover = hsla([theme.focus[0], theme.focus[1], theme.focus[2], 0.2]);
-                for (ix, (item, depth)) in rows.into_iter().enumerate() {
-                    if item.separator_before {
-                        list = list.child(
-                            div()
-                                .my(px(4.0))
-                                .mx(px(8.0))
-                                .h(px(1.0))
-                                .bg(hsla(theme.card_border)),
-                        );
-                    }
-                    let color = if item.enabled { theme.text } else { theme.text_faint };
-                    let mut row = div()
-                        .id(("graphy-menu-item", ix))
-                        .h(px(MENU_ROW_H))
-                        .pl(px(12.0 + depth as f32 * 12.0))
-                        .pr_3()
-                        .flex()
-                        .items_center()
-                        .text_sm()
-                        .text_color(hsla(color))
-                        .child(SharedString::from(item.label.clone()));
-                    if item.enabled {
-                        let (entity, id) = (entity.clone(), item.id.clone());
-                        row = row
-                            .cursor_pointer()
-                            .hover(move |s| s.bg(hover))
-                            .on_mouse_down(GpuiButton::Left, move |_, _, cx| {
-                                entity.update(cx, |c, cx| c.choose_menu_item(&id, cx));
-                            });
-                    }
-                    list = list.child(row);
+                let mut list = div().w(px(MENU_WIDTH)).bg(cx.theme().popover).py(px(4.0));
+                for item in flatten_menu(items) {
+                    list = list.children(menu_entry(item, &entity, cx));
                 }
-                Some(list.into_any_element())
+                Some(shell(*at, 2, list))
             }
             Overlay::Picker { at, view, .. } => {
-                let h = PICKER_SIZE.1.min((vp.y - 16.0).max(160.0));
-                let (x, y) = place(*at, PICKER_SIZE.0, h);
+                let view = view.clone()?;
                 let entity = cx.entity();
-                Some(
-                    shell(x, y, PICKER_SIZE.0, h)
-                        .child(view.clone())
-                        .on_children_prepainted(move |_, window, cx| {
-                            entity.update(cx, |c, cx| {
-                                if let Some(Overlay::Picker {
-                                    view,
-                                    focus_pending,
-                                    ..
-                                }) = &mut c.overlay
-                                {
-                                    if std::mem::take(focus_pending) {
-                                        let handle = view.read(cx).focus_handle(cx);
-                                        window.focus(&handle, cx);
-                                    }
+                let body = div()
+                    .w(px(PICKER_SIZE.0))
+                    .h(px(PICKER_SIZE.1))
+                    .overflow_hidden()
+                    .child(view)
+                    .on_children_prepainted(move |_, window, cx| {
+                        entity.update(cx, |c, cx| {
+                            if let Some(Overlay::Picker {
+                                view: Some(view),
+                                focus_pending,
+                                ..
+                            }) = &mut c.overlay
+                            {
+                                if std::mem::take(focus_pending) {
+                                    let handle = view.read(cx).search_focus_handle(cx);
+                                    window.focus(&handle, cx);
                                 }
-                            });
-                        })
-                        .into_any_element(),
-                )
+                            }
+                        });
+                    });
+                Some(shell(*at, 1, body))
             }
         }
     }
@@ -782,6 +814,10 @@ impl SurfaceDriver {
 }
 
 /// The menu's items in display order, children indented below their parent.
+fn theme_color(c: graphy_render::Color) -> gpui::Hsla {
+    gpui::Rgba { r: c[0], g: c[1], b: c[2], a: c[3] }.into()
+}
+
 fn flatten_menu(items: &[MenuItem]) -> Vec<(MenuItem, usize)> {
     fn walk(items: &[MenuItem], depth: usize, out: &mut Vec<(MenuItem, usize)>) {
         for item in items {
@@ -816,6 +852,7 @@ fn surface_driver(entity: &Entity<GraphCanvas>, current: &Rc<Cell<u64>>) -> gpui
 
 impl Render for GraphCanvas {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.ensure_picker(window, cx);
         let entity = cx.entity();
         let display: AnyElement = match &self.surface {
             Some(s) => wgpu_surface(s.clone())
@@ -826,7 +863,7 @@ impl Render for GraphCanvas {
             None => div()
                 .absolute()
                 .inset_0()
-                .bg(hsla(self.theme.canvas))
+                .bg(theme_color(self.theme.canvas))
                 .into_any_element(),
         };
         let driver = surface_driver(&entity, &self.driver)

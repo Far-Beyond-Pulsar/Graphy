@@ -161,3 +161,14 @@ pub fn mix(a: Color, b: Color, t: f32) -> Color {
 pub fn with_alpha(c: Color, a: f32) -> Color {
     [c[0], c[1], c[2], a]
 }
+
+/// Parses `#RRGGBB` or `#RRGGBBAA` (the leading `#` is optional).
+pub fn parse_hex(hex: &str) -> Option<Color> {
+    let hex = hex.trim_start_matches('#');
+    let byte = |i: usize| u8::from_str_radix(hex.get(i..i + 2)?, 16).ok();
+    match hex.len() {
+        6 => Some(rgba(byte(0)?, byte(2)?, byte(4)?, 1.0)),
+        8 => Some(rgba(byte(0)?, byte(2)?, byte(4)?, f32::from(byte(6)?) / 255.0)),
+        _ => None,
+    }
+}

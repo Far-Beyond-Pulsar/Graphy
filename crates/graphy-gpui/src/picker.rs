@@ -1,53 +1,43 @@
-//! The shared node picker and context menu (feature `gpui`).
+//! The shared node picker (feature `gpui`): a profile-supplied catalogue
+//! ([`CatalogEntry`]) with search, foldable categories and, when opened by a
+//! dropped wire, only the entries that can take the wire's type.
 //!
-//! Both are drawn by [`GraphCanvas`](crate::canvas::GraphCanvas) itself, as
-//! children of the canvas element positioned in **canvas-relative** pixels, so
-//! they open exactly at the pointer (right-click or wire drop) whatever the
-//! window offset, pan, zoom or DPI scale. Colours come from the canvas
-//! [`Theme`], so the popups match the graph and the host's theme.
-//!
-//! The picker is a profile-supplied catalogue ([`CatalogEntry`]) with search,
-//! foldable categories and, when opened by a dropped wire, only the entries
-//! that can take the wire's type. It has its own tiny text field (type,
-//! backspace, paste, arrows, enter, escape) so Graphy needs no UI toolkit.
+//! It is drawn with the app's UI toolkit (`ui`: text input, virtual list,
+//! scrollbar, theme colours) so it looks like the rest of the editor, and it
+//! serves every graph editor: the canvas opens it over itself, and a host can
+//! dock the same entity as a palette panel. The list model is
+//! [`crate::catalog`]; this file only draws it.
 
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use gpui::prelude::*;
 use gpui::{
-    div, px, uniform_list, App, Context, EventEmitter, FocusHandle, Focusable, Hsla,
-    InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Render, Rgba,
-    ScrollStrategy, SharedString, Styled, UniformListScrollHandle,
-    Window,
+    div, px, size, AnyElement, App, Context, Entity, EventEmitter, FocusHandle, Focusable, Hsla,
+    KeyDownEvent, MouseButton, Pixels, Render, Rgba, ScrollStrategy, SharedString, Size,
+    Subscription, Window,
 };
-use graphy_render::{Color, Theme};
+use graphy_render::Color;
+use ui::input::{InputEvent, InputState, TextInput};
+use ui::scroll::{Scrollbar, ScrollbarState};
+use ui::{h_flex, v_flex, v_virtual_list, ActiveTheme, Icon, IconName, VirtualListScrollHandle};
 
 use crate::catalog::{matching_count, visible_rows, Row};
 use crate::profile::CatalogEntry;
 
 /// Size of the picker popup.
-pub const PICKER_SIZE: (f32, f32) = (320.0, 440.0);
-/// Width of a context menu.
-pub const MENU_WIDTH: f32 = 220.0;
-/// Height of one context-menu row.
-pub const MENU_ROW_H: f32 = 28.0;
-const ROW_H: f32 = 40.0;
+pub const PICKER_SIZE: (f32, f32) = (320.0, 480.0);
+const CATEGORY_HEADER_H: f32 = 28.0;
+const NODE_ENTRY_H: f32 = 52.0;
 
-pub(crate) fn rgba(c: Color) -> Rgba {
+fn hsla(c: Color) -> Hsla {
     Rgba {
         r: c[0],
         g: c[1],
         b: c[2],
         a: c[3],
     }
-}
-
-pub(crate) fn hsla(c: Color) -> Hsla {
-    rgba(c).into()
-}
-
-fn with_alpha(c: Color, a: f32) -> Hsla {
-    hsla([c[0], c[1], c[2], c[3] * a])
+    .into()
 }
 
 /// What the picker reports.
@@ -68,16 +58,15 @@ pub struct DragChip {
 
 pub struct NodePicker {
     entries: Vec<CatalogEntry>,
-    query: String,
-    expanded: HashSet<String>,
-    /// Index into the visible rows, always an entry row when there is one.
-    highlighted: usize,
-    /// A list already narrowed to what fits a wire opens every category.
-    open_all: bool,
     chip: Option<DragChip>,
-    theme: Theme,
     focus: FocusHandle,
-    scroll: UniformListScrollHandle,
+    search: Entity<InputState>,
+    scroll: VirtualListScrollHandle,
+    scrollbar: ScrollbarState,
+    /// Categories the user opened by hand. They show every node, even while a
+    /// search is narrowing the others to their matches.
+    expanded: HashSet<String>,
+    _subscription: Subscription,
 }
 
 impl EventEmitter<PickerEvent> for NodePicker {}
@@ -92,398 +81,360 @@ impl NodePicker {
     pub fn new(
         entries: Vec<CatalogEntry>,
         chip: Option<DragChip>,
-        theme: Theme,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let mut picker = Self {
-            open_all: chip.is_some(),
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search nodes…"));
+        let subscription = cx.subscribe_in(
+            &search,
+            window,
+            |this, _input, event: &InputEvent, _window, cx| {
+                if matches!(event, InputEvent::Change) {
+                    this.scroll.scroll_to_item(0, ScrollStrategy::Top);
+                    cx.notify();
+                }
+            },
+        );
+        Self {
             entries,
-            query: String::new(),
-            expanded: HashSet::new(),
-            highlighted: 0,
             chip,
-            theme,
             focus: cx.focus_handle(),
-            scroll: UniformListScrollHandle::new(),
-        };
-        picker.highlighted = picker.first_entry_row().unwrap_or(0);
-        picker
+            search,
+            scroll: VirtualListScrollHandle::new(),
+            scrollbar: ScrollbarState::default(),
+            expanded: HashSet::new(),
+            _subscription: subscription,
+        }
     }
 
-    pub fn set_theme(&mut self, theme: Theme) {
-        self.theme = theme;
-    }
-
-    fn rows(&self) -> Vec<Row> {
-        visible_rows(&self.entries, &self.query, &self.expanded, self.open_all)
-    }
-
-    fn first_entry_row(&self) -> Option<usize> {
-        self.rows().iter().position(|r| matches!(r, Row::Entry(_)))
-    }
-
-    fn set_query(&mut self, query: String, cx: &mut Context<Self>) {
-        self.query = query;
-        self.highlighted = self.first_entry_row().unwrap_or(0);
-        self.scroll.scroll_to_item(0, ScrollStrategy::Top);
+    /// Replaces the catalogue (the host's entries changed), keeping the query.
+    pub fn set_entries(&mut self, entries: Vec<CatalogEntry>, cx: &mut Context<Self>) {
+        self.entries = entries;
         cx.notify();
     }
 
-    fn step(&mut self, forward: bool, cx: &mut Context<Self>) {
-        let rows = self.rows();
-        let entry_rows: Vec<usize> = rows
-            .iter()
-            .enumerate()
-            .filter_map(|(i, r)| matches!(r, Row::Entry(_)).then_some(i))
-            .collect();
-        if entry_rows.is_empty() {
-            return;
-        }
-        let at = entry_rows.iter().position(|&i| i == self.highlighted);
-        let next = match (at, forward) {
-            (Some(i), true) => (i + 1).min(entry_rows.len() - 1),
-            (Some(i), false) => i.saturating_sub(1),
-            (None, _) => 0,
-        };
-        self.highlighted = entry_rows[next];
-        self.scroll
-            .scroll_to_item(self.highlighted, ScrollStrategy::Nearest);
-        cx.notify();
+    /// The search field's focus handle, to focus when the picker opens.
+    pub fn search_focus_handle(&self, cx: &App) -> FocusHandle {
+        self.search.read(cx).focus_handle(cx)
     }
 
-    fn choose_highlighted(&mut self, cx: &mut Context<Self>) {
-        let rows = self.rows();
-        let row = rows
-            .get(self.highlighted)
-            .filter(|r| matches!(r, Row::Entry(_)))
-            .or_else(|| rows.iter().find(|r| matches!(r, Row::Entry(_))));
-        if let Some(Row::Entry(i)) = row {
-            cx.emit(PickerEvent::Chosen(self.entries[*i].definition.clone()));
-        }
-    }
-
-    fn toggle(&mut self, category: &str, cx: &mut Context<Self>) {
-        if !self.expanded.remove(category) {
-            self.expanded.insert(category.to_string());
+    /// Open the category if it was folded, fold it if the user had opened it.
+    fn toggle_category(&mut self, name: &str, cx: &mut Context<Self>) {
+        if !self.expanded.remove(name) {
+            self.expanded.insert(name.to_string());
         }
         cx.notify();
-    }
-
-    fn on_key(&mut self, ev: &KeyDownEvent, cx: &mut Context<Self>) {
-        let k = &ev.keystroke;
-        let command = k.modifiers.control || k.modifiers.platform;
-        match k.key.as_str() {
-            "escape" => cx.emit(PickerEvent::Dismissed),
-            "enter" => self.choose_highlighted(cx),
-            "down" => self.step(true, cx),
-            "up" => self.step(false, cx),
-            "backspace" => {
-                let mut q = self.query.clone();
-                q.pop();
-                self.set_query(q, cx);
-            }
-            "v" if command => {
-                if let Some(text) = cx.read_from_clipboard().and_then(|i| i.text()) {
-                    let line: String = text.lines().next().unwrap_or_default().to_string();
-                    self.set_query(format!("{}{line}", self.query), cx);
-                }
-            }
-            _ if !command && !k.modifiers.alt => {
-                if let Some(ch) = k.key_char.as_deref().filter(|c| !c.chars().any(char::is_control))
-                {
-                    self.set_query(format!("{}{ch}", self.query), cx);
-                }
-            }
-            _ => {}
-        }
-        cx.stop_propagation();
     }
 }
 
-/// An owned snapshot of one row, so the list closure needs no access to the view.
-enum RowView {
-    Header {
-        name: String,
-        color: Color,
-        count: String,
-        open: bool,
-    },
-    Entry {
-        definition: String,
-        title: String,
-        description: String,
-        icon: String,
-        color: Color,
-        highlighted: bool,
-    },
+fn item_sizes(rows: &[Row]) -> Rc<Vec<Size<Pixels>>> {
+    Rc::new(
+        rows.iter()
+            .map(|row| {
+                size(
+                    px(0.0),
+                    px(match row {
+                        Row::Header { .. } => CATEGORY_HEADER_H,
+                        Row::Entry(_) => NODE_ENTRY_H,
+                    }),
+                )
+            })
+            .collect(),
+    )
 }
 
 impl Render for NodePicker {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme.clone();
-        let rows = self.rows();
-        let total = matching_count(&self.entries, &self.query);
-        let accent = |c: Option<Color>| c.unwrap_or(theme.focus);
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let query = self.search.read(cx).value().to_string();
+        // Opened by a dropped wire: the list is already narrowed to what fits, so
+        // every category opens.
+        let rows = visible_rows(&self.entries, &query, &self.expanded, self.chip.is_some());
+        let node_count = matching_count(&self.entries, &query);
+        let sizes = item_sizes(&rows);
+        let filter_color = self
+            .chip
+            .as_ref()
+            .and_then(|c| c.color)
+            .map(hsla)
+            .unwrap_or_else(|| cx.theme().border);
+        let filter_label = self.chip.as_ref().map(|c| c.label.clone());
 
-        let views: Rc<Vec<RowView>> = Rc::new(
-            rows.iter()
-                .enumerate()
-                .map(|(ix, row)| match row {
-                    Row::Header {
-                        name,
-                        color,
-                        count,
-                        open,
-                        matched,
-                    } => RowView::Header {
-                        name: name.clone(),
-                        color: accent(*color),
-                        count: match matched {
-                            Some(m) if *m < *count => format!("{m} / {count}"),
-                            _ => count.to_string(),
-                        },
-                        open: *open,
-                    },
-                    Row::Entry(i) => {
-                        let e = &self.entries[*i];
-                        RowView::Entry {
-                            definition: e.definition.clone(),
-                            title: e.title.clone(),
-                            description: e.description.clone(),
-                            icon: e.icon.clone(),
-                            color: accent(e.color),
-                            highlighted: ix == self.highlighted,
-                        }
-                    }
-                })
-                .collect(),
-        );
+        // Owned snapshot for the 'static virtual-list closure.
+        let entries = self.entries.clone();
+        let view = cx.entity().clone();
+        let scroll = self.scroll.clone();
+        let scrollbar = self.scrollbar.clone();
 
-        let this = cx.entity();
-        let list = {
-            let theme = theme.clone();
-            let views = views.clone();
-            uniform_list("graphy-picker-list", views.len(), move |range, _, _| {
-                range
-                    .map(|ix| match &views[ix] {
-                        RowView::Header {
-                            name,
-                            color,
-                            count,
-                            open,
-                        } => {
-                            let name_key = name.clone();
-                            let this = this.clone();
-                            div()
-                                .id(("graphy-picker-header", ix))
-                                .h(px(ROW_H * 0.7))
-                                .w_full()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .bg(hsla(theme.card_header))
-                                .border_b_1()
-                                .border_color(with_alpha(theme.card_border, 0.5))
-                                .cursor_pointer()
-                                .hover(|s| s.bg(with_alpha(theme.focus, 0.15)))
-                                .child(div().w(px(3.0)).h_full().bg(hsla(*color)))
-                                .child(
-                                    div()
-                                        .w(px(12.0))
-                                        .text_xs()
-                                        .text_color(hsla(theme.text_dim))
-                                        .child(if *open { "v" } else { ">" }),
-                                )
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .text_xs()
-                                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                                        .text_color(hsla(theme.text))
-                                        .child(SharedString::from(name.to_uppercase())),
-                                )
-                                .child(
-                                    div()
-                                        .pr_3()
-                                        .text_xs()
-                                        .text_color(hsla(theme.text_dim))
-                                        .child(SharedString::from(count.clone())),
-                                )
-                                .on_mouse_down(MouseButton::Left, move |_, _, cx| {
-                                    this.update(cx, |p, cx| p.toggle(&name_key, cx));
-                                })
-                                .into_any_element()
-                        }
-                        RowView::Entry {
-                            definition,
-                            title,
-                            description,
-                            icon,
-                            color,
-                            highlighted,
-                        } => {
-                            let definition = definition.clone();
-                            let this = this.clone();
-                            div()
-                                .id(("graphy-picker-entry", ix))
-                                .h(px(ROW_H))
-                                .w_full()
-                                .px_3()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .cursor_pointer()
-                                .when_highlighted(*highlighted, theme.focus)
-                                .hover(|s| s.bg(with_alpha(theme.focus, 0.18)))
-                                .child(
-                                    div()
-                                        .w(px(26.0))
-                                        .h(px(26.0))
-                                        .flex_shrink_0()
-                                        .rounded_full()
-                                        .bg(with_alpha(*color, 0.22))
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .text_color(hsla(*color))
-                                        .text_sm()
-                                        .child(SharedString::from(if icon.is_empty() {
-                                            title.chars().next().map(String::from).unwrap_or_default()
-                                        } else {
-                                            icon.clone()
-                                        })),
-                                )
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .overflow_hidden()
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                .text_color(hsla(theme.text))
-                                                .child(SharedString::from(title.clone())),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(hsla(theme.text_dim))
-                                                .whitespace_nowrap()
-                                                .overflow_hidden()
-                                                .child(SharedString::from(description.clone())),
-                                        ),
-                                )
-                                .on_mouse_down(MouseButton::Left, move |_, _, cx| {
-                                    let definition = definition.clone();
-                                    this.update(cx, |_, cx| cx.emit(PickerEvent::Chosen(definition)));
-                                })
-                                .into_any_element()
-                        }
-                    })
-                    .collect()
-            })
-            .track_scroll(&self.scroll)
-            .flex_1()
-            .min_h_0()
-        };
-
-        let chip = self.chip.clone().map(|chip| {
-            let color = chip.color.unwrap_or(theme.focus);
-            div()
-                .px_1p5()
-                .rounded_sm()
-                .bg(with_alpha(color, 0.2))
-                .border_1()
-                .border_color(with_alpha(color, 0.6))
-                .text_xs()
-                .text_color(hsla(theme.text))
-                .child(SharedString::from(chip.label))
-        });
-        let query_text: SharedString = if self.query.is_empty() {
-            "Search nodes…".into()
-        } else {
-            format!("{}\u{258F}", self.query).into()
-        };
-
-        div()
+        v_flex()
             .size_full()
-            .flex()
-            .flex_col()
+            .bg(cx.theme().sidebar)
             .track_focus(&self.focus)
-            .key_context("GraphyPicker")
-            .on_key_down(cx.listener(|p, ev: &KeyDownEvent, _, cx| p.on_key(ev, cx)))
+            .on_key_down(cx.listener(|_, ev: &KeyDownEvent, _, cx| {
+                if ev.keystroke.key == "escape" {
+                    cx.emit(PickerEvent::Dismissed);
+                }
+            }))
+            // ── Header: title row + search box ────────────────────────────────
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .px_3()
-                    .py_2()
-                    .bg(hsla(theme.card_header))
-                    .border_b_1()
-                    .border_color(hsla(theme.card_border))
+                v_flex()
+                    .w_full()
                     .child(
-                        div()
-                            .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_color(hsla(theme.text))
-                            .child("Add node"),
+                        h_flex()
+                            .w_full()
+                            .px_3()
+                            .py_2()
+                            .bg(cx.theme().secondary)
+                            .border_b_1()
+                            .border_color(cx.theme().border)
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .items_center()
+                                    .child(Icon::new(IconName::Search).size(px(14.0)))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                                            .text_color(cx.theme().foreground)
+                                            .child("Palette"),
+                                    ),
+                            )
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .items_center()
+                                    .when_some(filter_label, |row, label| {
+                                        row.child(
+                                            div()
+                                                .px_1p5()
+                                                .rounded_sm()
+                                                .bg(filter_color.opacity(0.2))
+                                                .border_1()
+                                                .border_color(filter_color.opacity(0.6))
+                                                .text_xs()
+                                                .text_color(cx.theme().foreground)
+                                                .child(label),
+                                        )
+                                    })
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(cx.theme().muted_foreground)
+                                            .child(format!("{node_count} nodes")),
+                                    ),
+                            ),
                     )
                     .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .children(chip)
+                        h_flex()
+                            .w_full()
+                            .px_2()
+                            .py_1p5()
+                            .bg(cx.theme().sidebar)
+                            .border_b_1()
+                            .border_color(cx.theme().border.opacity(0.4))
                             .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(hsla(theme.text_dim))
-                                    .child(SharedString::from(format!("{total} nodes"))),
+                                TextInput::new(&self.search)
+                                    .w_full()
+                                    .appearance(false)
+                                    .prefix(
+                                        Icon::new(IconName::Search)
+                                            .size(px(12.0))
+                                            .text_color(cx.theme().muted_foreground),
+                                    )
+                                    .cleanable(),
                             ),
                     ),
             )
+            // ── Scrollable node list ───────────────────────────────────────────
             .child(
                 div()
-                    .px_2()
-                    .py_1p5()
-                    .border_b_1()
-                    .border_color(with_alpha(theme.card_border, 0.6))
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_hidden()
+                    .relative()
+                    .child(
+                        v_virtual_list(
+                            view,
+                            "graphy-node-picker-list",
+                            sizes,
+                            move |_view, range, _window, cx| {
+                                range
+                                    .map(|ix| -> AnyElement {
+                                        match rows.get(ix) {
+                                            Some(Row::Header {
+                                                name,
+                                                color,
+                                                count,
+                                                open,
+                                                matched,
+                                            }) => category_header(
+                                                ix,
+                                                name,
+                                                color.map(hsla),
+                                                *count,
+                                                *open,
+                                                *matched,
+                                                cx,
+                                            )
+                                            .into_any_element(),
+                                            Some(Row::Entry(i)) => {
+                                                node_row(ix, &entries[*i], cx).into_any_element()
+                                            }
+                                            None => div().h(px(NODE_ENTRY_H)).into_any_element(),
+                                        }
+                                    })
+                                    .collect()
+                            },
+                        )
+                        .size_full()
+                        .track_scroll(&scroll),
+                    )
                     .child(
                         div()
-                            .px_2()
-                            .py_1()
-                            .rounded_sm()
-                            .bg(hsla(theme.card_body))
-                            .border_1()
-                            .border_color(if self.focus.is_focused(window) {
-                                hsla(theme.focus)
-                            } else {
-                                hsla(theme.card_border)
-                            })
-                            .text_sm()
-                            .text_color(if self.query.is_empty() {
-                                hsla(theme.text_faint)
-                            } else {
-                                hsla(theme.text)
-                            })
-                            .child(query_text),
+                            .absolute()
+                            .inset_0()
+                            .child(Scrollbar::vertical(&scrollbar, &scroll)),
                     ),
             )
-            .child(list)
     }
 }
 
-/// `when_highlighted` keeps the row builder chain readable.
-trait HighlightExt: Styled + Sized {
-    fn when_highlighted(self, on: bool, color: Color) -> Self {
-        if on {
-            self.bg(with_alpha(color, 0.22))
-        } else {
-            self
-        }
-    }
+/// Category-header row: click to fold or unfold the category. While a search
+/// narrows the category the count reads `matched / total`.
+fn category_header(
+    ix: usize,
+    name: &str,
+    accent: Option<Hsla>,
+    node_count: usize,
+    expanded: bool,
+    matched: Option<usize>,
+    cx: &mut Context<NodePicker>,
+) -> impl IntoElement {
+    let accent = accent.unwrap_or(cx.theme().primary);
+    let toggle_name = name.to_string();
+    let count = match matched {
+        Some(matched) if matched < node_count => format!("{matched} / {node_count}"),
+        _ => node_count.to_string(),
+    };
+    let muted = cx.theme().muted_foreground;
+
+    h_flex()
+        .id(("graphy-picker-category", ix as u64))
+        .w_full()
+        .h(px(CATEGORY_HEADER_H))
+        .items_center()
+        .justify_between()
+        .cursor_pointer()
+        .bg(cx.theme().muted.opacity(if expanded { 0.22 } else { 0.15 }))
+        .border_b_1()
+        .border_color(cx.theme().border.opacity(0.3))
+        .hover(|s| s.bg(cx.theme().muted.opacity(0.3)))
+        // Coloured left-edge accent bar
+        .child(
+            div()
+                .w(px(3.0))
+                .h(px(CATEGORY_HEADER_H))
+                .flex_shrink_0()
+                .bg(accent.opacity(if expanded { 0.9 } else { 0.7 })),
+        )
+        .child(
+            Icon::new(if expanded {
+                IconName::ChevronDown
+            } else {
+                IconName::ChevronRight
+            })
+            .size(px(12.0))
+            .text_color(muted)
+            .ml_2(),
+        )
+        .child(
+            div()
+                .flex_1()
+                .px_2()
+                .text_xs()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(if expanded {
+                    cx.theme().foreground
+                } else {
+                    muted
+                })
+                .child(SharedString::from(name.to_uppercase())),
+        )
+        .child(div().px_3().text_xs().text_color(muted).child(count))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |view, _event, _window, cx| {
+                view.toggle_category(&toggle_name, cx);
+            }),
+        )
 }
 
-impl<T: Styled + Sized> HighlightExt for T {}
+/// Clickable node-entry row: icon pill + name/description.
+fn node_row(ix: usize, entry: &CatalogEntry, cx: &mut Context<NodePicker>) -> impl IntoElement {
+    let accent = entry.color.map(hsla).unwrap_or(cx.theme().primary);
+    let definition = entry.definition.clone();
+    let glyph = if entry.icon.is_empty() {
+        entry
+            .title
+            .chars()
+            .next()
+            .map(String::from)
+            .unwrap_or_default()
+    } else {
+        entry.icon.clone()
+    };
+
+    h_flex()
+        .id(("graphy-picker-node", ix as u64))
+        .w_full()
+        .h(px(NODE_ENTRY_H))
+        .px_3()
+        .gap_2()
+        .items_center()
+        .cursor_pointer()
+        .border_b_1()
+        .border_color(cx.theme().border.opacity(0.15))
+        .hover(|s| s.bg(cx.theme().accent.opacity(0.06)))
+        // Icon pill
+        .child(
+            div()
+                .w(px(28.0))
+                .h(px(28.0))
+                .flex_shrink_0()
+                .rounded_full()
+                .bg(accent.opacity(0.18))
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_base()
+                .child(SharedString::from(glyph)),
+        )
+        // Name + description
+        .child(
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .gap_0p5()
+                .child(
+                    div()
+                        .text_xs()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(cx.theme().foreground)
+                        .child(SharedString::from(entry.title.clone())),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(SharedString::from(entry.description.clone())),
+                ),
+        )
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |_view, _event, _window, cx| {
+                cx.emit(PickerEvent::Chosen(definition.clone()));
+            }),
+        )
+}

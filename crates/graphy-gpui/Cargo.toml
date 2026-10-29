@@ -15,7 +15,7 @@ license = "MIT"
 
 [features]
 default = []
-gpui = ["dep:gpui", "dep:graphy-render-wgpu", "dep:wgpu"]
+gpui = ["dep:gpui", "dep:ui", "dep:graphy-render-wgpu", "dep:wgpu"]
 
 [dependencies]
 graphy = { path = "../.." }
@@ -26,6 +26,8 @@ serde_json = "1"
 graphy-render-wgpu = { path = "../graphy-render-wgpu", optional = true }
 wgpu = { version = "30.0.0", default-features = false, features = ["wgsl"], optional = true }
 gpui = { package = "gpui-ce", git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef", optional = true }
+# The editors' UI toolkit: the shared picker and menu look like the rest of the app.
+ui = { git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef", optional = true }
 
 [patch."https://github.com/Far-Beyond-Pulsar/WGPUI"]
 gpui-ce = { git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef" }
