@@ -42,12 +42,12 @@ pub struct Theme {
 impl Theme {
     pub fn dark() -> Theme {
         Theme {
-            canvas: rgba(0x0f, 0x0f, 0x0f, 1.0),
+            canvas: rgba(0x17, 0x17, 0x17, 1.0),
             grid_minor: rgba(0xff, 0xff, 0xff, 0.10),
             grid_major: rgba(0xff, 0xff, 0xff, 0.19),
 
-            card_body: rgba(0x17, 0x17, 0x17, 1.0),
-            card_header: rgba(0x20, 0x20, 0x20, 1.0),
+            card_body: rgba(0x22, 0x22, 0x22, 1.0),
+            card_header: rgba(0x2c, 0x2c, 0x2c, 1.0),
             card_border: rgba(0x4a, 0x4a, 0x4e, 1.0),
             card_border_hover: rgba(0x73, 0x73, 0x78, 1.0),
             shadow: rgba(0x00, 0x00, 0x00, 0.55),
@@ -67,7 +67,7 @@ impl Theme {
             preview_well: rgba(0x0b, 0x0b, 0x0b, 1.0),
 
             wire_default: rgba(0x8b, 0x8b, 0x8b, 1.0),
-            dim_target: rgba(0x0f, 0x0f, 0x0f, 1.0),
+            dim_target: rgba(0x17, 0x17, 0x17, 1.0),
         }
     }
 }
@@ -101,8 +101,11 @@ impl Default for WireWeights {
 /// whole canvas palette from them. All are display-space RGBA.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ThemeColors {
-    /// The page behind the graph.
+    /// The app's page colour; node bodies and headers are mixed from it.
     pub background: Color,
+    /// The graph's own background (the grid sits on it), e.g. the theme's
+    /// secondary surface.
+    pub canvas: Color,
     /// Primary text colour.
     pub foreground: Color,
     /// Secondary text colour.
@@ -161,18 +164,12 @@ impl Theme {
     /// is pushed to stay readable on every surface it is drawn over.
     pub fn from_colors(c: &ThemeColors) -> Theme {
         let background = with_alpha(c.background, 1.0);
+        let canvas = with_alpha(c.canvas, 1.0);
         let fg = with_alpha(c.foreground, 1.0);
         let dark = relative_luminance(background) < 0.4;
-        // A dark graph never sinks below #0f0f0f, so cards stay visible on it even
-        // when the app background is nearly black.
-        let canvas = if dark {
-            [background[0].max(15.0 / 255.0), background[1].max(15.0 / 255.0), background[2].max(15.0 / 255.0), 1.0]
-        } else {
-            background
-        };
         let card_body = mix(canvas, fg, 0.05);
         let card_header = mix(canvas, fg, 0.10);
-        let surfaces = [canvas, card_body, card_header];
+        let surfaces = [canvas, background, card_body, card_header];
         let (grid_minor, grid_major) = if dark { (0.10, 0.19) } else { (0.07, 0.14) };
         let accent = with_alpha(c.accent, 1.0);
         Theme {
@@ -182,8 +179,8 @@ impl Theme {
 
             card_body,
             card_header,
-            card_border: mix(canvas, fg, 0.30),
-            card_border_hover: mix(canvas, fg, 0.48),
+            card_border: mix(canvas, fg, 0.36),
+            card_border_hover: mix(canvas, fg, 0.52),
             shadow: [0.0, 0.0, 0.0, if dark { 0.55 } else { 0.25 }],
 
             select: fg,
@@ -213,6 +210,7 @@ mod tests {
     fn colors(background: Color, foreground: Color, muted: Color) -> ThemeColors {
         ThemeColors {
             background,
+            canvas: mix(background, foreground, 0.06),
             foreground,
             muted_foreground: muted,
             border: mix(background, foreground, 0.2),
@@ -222,7 +220,7 @@ mod tests {
 
     fn themes() -> Vec<(&'static str, ThemeColors)> {
         vec![
-            ("default dark", colors(rgba(0x05, 0x05, 0x05, 1.0), rgba(0xf2, 0xf2, 0xf2, 1.0), rgba(0xa3, 0xa3, 0xa3, 1.0))),
+            ("default dark", colors(rgba(0x0a, 0x0a, 0x0a, 1.0), rgba(0xf2, 0xf2, 0xf2, 1.0), rgba(0xa3, 0xa3, 0xa3, 1.0))),
             ("light", colors(rgba(0xfa, 0xfa, 0xfa, 1.0), rgba(0x17, 0x17, 0x17, 1.0), rgba(0x73, 0x73, 0x73, 1.0))),
             ("mid blue", colors(rgba(0x2a, 0x35, 0x5a, 1.0), rgba(0xe0, 0xe6, 0xff, 1.0), rgba(0x90, 0x9a, 0xc0, 1.0))),
             ("sepia", colors(rgba(0xf4, 0xec, 0xd8, 1.0), rgba(0x5b, 0x46, 0x36, 1.0), rgba(0x8a, 0x76, 0x62, 1.0))),
@@ -232,8 +230,8 @@ mod tests {
     }
 
     #[test]
-    fn default_canvas_is_0f0f0f() {
-        assert_eq!(Theme::dark().canvas, rgba(0x0f, 0x0f, 0x0f, 1.0));
+    fn default_canvas_is_the_default_dark_secondary() {
+        assert_eq!(Theme::dark().canvas, rgba(0x17, 0x17, 0x17, 1.0));
         assert_eq!(Theme::default().dim_target, Theme::dark().canvas);
     }
 
@@ -253,7 +251,7 @@ mod tests {
     fn cards_and_grid_are_distinguishable_from_the_canvas() {
         for (name, c) in themes() {
             let t = Theme::from_colors(&c);
-            assert!(relative_luminance(t.canvas) >= relative_luminance(with_alpha(c.background, 1.0)), "{name}");
+            assert_eq!(t.canvas, with_alpha(c.canvas, 1.0), "{name}");
             let over = |line: Color| mix(t.canvas, with_alpha(line, 1.0), line[3]);
             assert!(contrast_ratio(over(t.grid_minor), t.canvas) > 1.03, "{name}: minor grid");
             assert!(contrast_ratio(over(t.grid_major), t.canvas) > contrast_ratio(over(t.grid_minor), t.canvas), "{name}: major > minor");
@@ -263,11 +261,11 @@ mod tests {
     }
 
     #[test]
-    fn a_dark_host_theme_reproduces_the_default_canvas_and_a_light_one_gets_a_light_canvas() {
+    fn the_canvas_is_the_host_canvas_colour_and_light_themes_stay_light() {
         let dark = Theme::from_colors(&themes()[0].1);
-        assert_eq!(dark.canvas, Theme::dark().canvas);
+        assert_eq!(dark.canvas, with_alpha(themes()[0].1.canvas, 1.0));
         let light = Theme::from_colors(&themes()[1].1);
-        assert!(relative_luminance(light.canvas) > 0.9);
-        assert!(relative_luminance(light.card_body) > 0.8, "cards stay light on a light theme");
+        assert!(relative_luminance(light.canvas) > 0.8);
+        assert!(relative_luminance(light.card_body) > 0.7, "cards stay light on a light theme");
     }
 }
