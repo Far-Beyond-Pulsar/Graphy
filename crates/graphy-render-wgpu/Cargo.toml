@@ -1,0 +1,24 @@
+[package]
+name = "graphy-render-wgpu"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pulsar Team"]
+description = "Shared WGPU drawing for Graphy graph canvases; renders into the host's device, queue and render pass"
+license = "MIT"
+
+# The host owns the device, queue and render target. This crate never creates a
+# device, adapter or surface; it only builds pipelines on the device it is given.
+# Backend features (dx12/vulkan/metal) are the host's choice.
+[dependencies]
+graphy-render = { path = "../graphy-render" }
+wgpu = { version = "30.0.0", default-features = false, features = ["wgsl"] }
+bytemuck = { version = "1", features = ["derive"] }
+fontdue = "0.9"
+
+[dev-dependencies]
+# Offscreen scene review: a real device with the platform backends, writing PNGs.
+wgpu = { version = "30.0.0", default-features = false, features = ["wgsl", "dx12", "vulkan", "metal"] }
+naga = { version = "30.0.1", features = ["wgsl-in"] }
+pollster = "0.4"
+png = "0.18"
+graphy = { path = "../.." }

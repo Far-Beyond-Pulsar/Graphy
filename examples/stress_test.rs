@@ -120,6 +120,7 @@ fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
     for row in 0..height {
         for col in 1..width {
             graph.add_connection(Connection {
+                id: None,
                 source_node: format!("n_{}_{}", row, col - 1),
                 source_pin: "result".to_string(),
                 target_node: format!("n_{}_{}", row, col),
@@ -134,6 +135,7 @@ fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
     for row in 1..height {
         for col in 0..width {
             graph.add_connection(Connection {
+                id: None,
                 source_node: format!("n_{}_{}", row - 1, col),
                 source_pin: "result".to_string(),
                 target_node: format!("n_{}_{}", row, col),
@@ -149,6 +151,7 @@ fn create_stress_grid(width: usize, height: usize) -> GraphDescription {
         for col in 1..width {
             if (row + col) % 3 == 0 {
                 graph.add_connection(Connection {
+                    id: None,
                     source_node: format!("n_{}_{}", row - 1, col - 1),
                     source_pin: "result".to_string(),
                     target_node: format!("n_{}_{}", row, col),

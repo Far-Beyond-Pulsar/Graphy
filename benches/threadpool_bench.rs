@@ -87,6 +87,7 @@ fn create_grid(size: usize) -> GraphDescription {
     for row in 0..size {
         for col in 1..size {
             graph.add_connection(Connection {
+                id: None,
                 source_node: format!("n_{}_{}", row, col - 1),
                 source_pin: "result".to_string(),
                 target_node: format!("n_{}_{}", row, col),
@@ -99,6 +100,7 @@ fn create_grid(size: usize) -> GraphDescription {
     for row in 1..size {
         for col in 0..size {
             graph.add_connection(Connection {
+                id: None,
                 source_node: format!("n_{}_{}", row - 1, col),
                 source_pin: "result".to_string(),
                 target_node: format!("n_{}_{}", row, col),

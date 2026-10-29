@@ -19,13 +19,7 @@
 //! graph.add_node(node);
 //!
 //! // Add a connection
-//! graph.add_connection(Connection {
-//!     source_node: "add_1".to_string(),
-//!     source_pin: "result".to_string(),
-//!     target_node: "print_1".to_string(),
-//!     target_pin: "value".to_string(),
-//!     connection_type: ConnectionType::Data,
-//! });
+//! graph.add_connection(Connection::new("add_1", "result", "print_1", "value", ConnectionType::Data));
 //! ```
 
 use super::{Connection, NodeInstance};
@@ -111,6 +105,10 @@ pub struct GraphDescription {
 /// during serialization but don't affect code generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphComment {
+    /// Stable id. Empty for documents that predate comment ids.
+    #[serde(default)]
+    pub id: String,
+
     /// The comment text content
     pub text: String,
 
@@ -119,6 +117,31 @@ pub struct GraphComment {
 
     /// Size of the comment box (width, height)
     pub size: (f64, f64),
+
+    /// Background colour as normalized RGBA.
+    #[serde(default = "GraphComment::default_color")]
+    pub color: [f32; 4],
+
+    /// Nodes the comment box contained when it was last placed or resized.
+    #[serde(default)]
+    pub contained_node_ids: Vec<String>,
+}
+
+impl GraphComment {
+    pub fn default_color() -> [f32; 4] {
+        [0.25, 0.25, 0.25, 0.35]
+    }
+
+    pub fn new(text: impl Into<String>, position: super::Position, size: (f64, f64)) -> Self {
+        Self {
+            id: String::new(),
+            text: text.into(),
+            position,
+            size,
+            color: Self::default_color(),
+            contained_node_ids: Vec::new(),
+        }
+    }
 }
 
 impl GraphDescription {

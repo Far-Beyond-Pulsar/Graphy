@@ -2,8 +2,8 @@
 //!
 //! Inline expansion of macro and collapsed-region nodes.
 //!
-//! The expander takes a [`BlueprintDocument`] (or a single [`GraphDescription`]
-//! with a graph library) and rewrites every `SubgraphCall` node into its
+//! The expander takes a single [`GraphDescription`] with a graph library and
+//! rewrites every `SubgraphCall` node into its
 //! constituent nodes, wiring connections through the `SubgraphEntry` /
 //! `SubgraphExit` interface nodes. The result is a flat graph that can be
 //! passed to data-flow and execution-flow analysis without any further
@@ -36,8 +36,8 @@
 //! ## Flat-graph mode
 //!
 //! [`SubGraphExpander::expand_all_flat`] accepts a single `GraphDescription`
-//! plus a `HashMap<String, GraphDescription>` library, for callers that don't
-//! use [`BlueprintDocument`].
+//! plus a `HashMap<String, GraphDescription>` library, for callers that
+//! hold their graphs in a different container.
 
 use std::collections::HashMap;
 
@@ -214,6 +214,7 @@ impl SubGraphExpander {
         // Clone all connections from sub, with prefixed node/pin IDs
         for conn in &sub.connections {
             parent.connections.push(Connection {
+                id: None,
                 source_node: format!("{}{}", prefix, conn.source_node),
                 source_pin: conn.source_pin.clone(),
                 target_node: format!("{}{}", prefix, conn.target_node),
@@ -231,6 +232,7 @@ impl SubGraphExpander {
                 // Incoming to call site → rewire to entry node
                 if let Some(entry_id) = &entry_node_id {
                     to_add.push(Connection {
+                        id: None,
                         source_node: conn.source_node.clone(),
                         source_pin: conn.source_pin.clone(),
                         target_node: entry_id.clone(),
@@ -243,6 +245,7 @@ impl SubGraphExpander {
                 // Outgoing from call site → rewire from exit node
                 if let Some(exit_id) = &exit_node_id {
                     to_add.push(Connection {
+                        id: None,
                         source_node: exit_id.clone(),
                         source_pin: conn.source_pin.clone(),
                         target_node: conn.target_node.clone(),

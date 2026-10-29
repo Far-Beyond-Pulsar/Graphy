@@ -45,6 +45,11 @@ pub enum ConnectionType {
 /// - No circular dependencies (for data connections)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Connection {
+    /// Stable edge id when the document carries one (authored Blueprint
+    /// assets do). Connections are otherwise identified by their endpoints.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+
     /// ID of the source node
     pub source_node: String,
 
@@ -84,6 +89,7 @@ impl Connection {
         connection_type: ConnectionType,
     ) -> Self {
         Self {
+            id: None,
             source_node: source_node.into(),
             source_pin: source_pin.into(),
             target_node: target_node.into(),

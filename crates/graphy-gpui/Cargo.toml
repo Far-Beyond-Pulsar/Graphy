@@ -1,0 +1,44 @@
+[package]
+name = "graphy-gpui"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pulsar Team"]
+description = "Shared graph canvas interaction, profile API and GPUI canvas for Graphy editors"
+license = "MIT"
+
+# This crate is its own Cargo workspace and is *excluded* from the Graphy
+# workspace. The interaction engine and profile API are plain Rust and build
+# with no features. The `gpui` feature adds the GPUI canvas, which needs the
+# Pulsar gpui fork and the wgpu fork it links; those patches live here so the
+# Graphy workspace (compiler, reflection, render) never resolves them.
+[workspace]
+
+[features]
+default = []
+gpui = ["dep:gpui", "dep:ui", "dep:graphy-render-wgpu", "dep:wgpu"]
+
+[dependencies]
+graphy = { path = "../.." }
+graphy-render = { path = "../graphy-render" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+graphy-render-wgpu = { path = "../graphy-render-wgpu", optional = true }
+wgpu = { version = "30.0.0", default-features = false, features = ["wgsl"], optional = true }
+gpui = { package = "gpui-ce", git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef", optional = true }
+# The editors' UI toolkit: the shared picker and menu look like the rest of the app.
+ui = { git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef", optional = true }
+
+[patch."https://github.com/Far-Beyond-Pulsar/WGPUI"]
+gpui-ce = { git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef" }
+
+# The gpui fork links the reusable-command-buffer wgpu fork; graphy-render-wgpu
+# must use the same wgpu types as the window's surface.
+[patch.crates-io]
+naga = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
+wgpu = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
+wgpu-core = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
+wgpu-core-deps-windows-linux-android = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
+wgpu-hal = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
+wgpu-naga-bridge = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
+wgpu-types = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
