@@ -333,6 +333,14 @@ impl GraphRenderer {
         }
     }
 
+    /// Whether colours are linearised before upload (default: when the target
+    /// format is sRGB). Turn it off for a target whose pixels reach the screen
+    /// without sRGB encoding, such as a GPUI surface, so colours authored in
+    /// display space appear as authored.
+    pub fn set_linearize_colors(&mut self, on: bool) {
+        self.srgb = on;
+    }
+
     /// Text measurer backed by the same fonts the renderer draws with. Build
     /// the `Scene` with this so layout and glyphs agree.
     pub fn text_measure(&self) -> FontMeasure {

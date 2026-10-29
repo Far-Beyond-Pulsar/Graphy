@@ -13,7 +13,7 @@ r.render(&mut pass);                      // or r.render_to_view(...)
 
 Targets: both `*Unorm` and `*Srgb` formats work. Colours are authored in display
 space and linearised on the CPU for `*Srgb` targets (GPUI surfaces are
-`Bgra8UnormSrgb`).
+`Bgra8UnormSrgb`; `GraphCanvas` turns the linearisation off with `set_linearize_colors(false)`, because the window shows the surface without sRGB encoding and linearised colours came out far too dark).
 
 ## Viewing the review scenes
 

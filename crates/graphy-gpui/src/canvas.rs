@@ -723,11 +723,16 @@ impl GraphCanvas {
             return false;
         };
         if self.renderer.is_none() {
-            self.renderer = Some(GraphRenderer::with_fonts(
+            let mut renderer = GraphRenderer::with_fonts(
                 surface.device(),
                 surface.format(),
                 self.fonts.clone(),
-            ));
+            );
+            // The window shows this surface's pixels without sRGB encoding, so
+            // linearising colours would darken everything (a #2e2c51 canvas came
+            // out as #070615). Draw display-space colours as they are.
+            renderer.set_linearize_colors(false);
+            self.renderer = Some(renderer);
         }
 
         let mut params = DrawParams::new(Vec2::new(lw, lh), self.controller.view);
