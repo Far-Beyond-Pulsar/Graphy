@@ -184,7 +184,8 @@ fn card(in: VOut) -> vec4<f32> {
     let t = clamp(y / in.size_px.y, 0.0, 1.0);
     var fill = vec4<f32>(in.body.rgb * (1.035 - 0.07 * t), in.body.a);
     if y < hh {
-        fill = vec4<f32>(mix(in.header.rgb, in.accent.rgb, select(0.05, 0.28, flat_)), in.header.a);
+        // title chip: a darker shade of the category colour, still clearly tinted
+        fill = vec4<f32>(mix(in.header.rgb, in.accent.rgb * 0.55, 0.78), in.header.a);
     }
     var out = shape(in, d, fill, sd);
 
@@ -195,10 +196,10 @@ fn card(in: VOut) -> vec4<f32> {
         let sep = clamp(0.5 * bw + 0.5 - abs(y - hh), 0.0, 1.0);
         out = over(out, pm(vec4<f32>(0.0, 0.0, 0.0, 0.32 * sep * c)));
         // category accent: a gradient underline just above the separator
-        let ul = max(1.5 * s, 2.0 * kk());
+        let ul = max(2.0 * s, 2.5 * kk());
         let band = clamp(0.5 + (y - (hh - ul)), 0.0, 1.0) * clamp(0.5 - (y - hh), 0.0, 1.0);
         let xt = clamp(in.local.x / in.size_px.x, 0.0, 1.0);
-        let a = mix(0.95, 0.12, smoothstep(0.0, 1.0, xt));
+        let a = mix(1.0, 0.4, smoothstep(0.0, 1.0, xt));
         let fade = select(1.0, 0.45, flag(in.flags, F_DISABLED));
         out = over(out, pm(vec4<f32>(in.accent.rgb, a * band * c * fade)));
     }

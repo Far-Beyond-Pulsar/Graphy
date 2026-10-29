@@ -709,3 +709,37 @@ impl Render for GraphCanvas {
             .on_key_down(keys)
     }
 }
+
+/// Fonts for the canvas text: a readable system font, with a compiled-in
+/// fallback so the canvas works on unusual setups. Every editor on the shared
+/// canvas uses these.
+pub fn system_fonts() -> FontSet {
+    let candidates: &[&str] = if cfg!(target_os = "macos") {
+        &[
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/Library/Fonts/Arial.ttf",
+            "/System/Library/Fonts/SFNSText.ttf",
+        ]
+    } else if cfg!(target_os = "windows") {
+        &[
+            r"C:\Windows\Fonts\segoeui.ttf",
+            r"C:\Windows\Fonts\arial.ttf",
+            r"C:\Windows\Fonts\calibri.ttf",
+        ]
+    } else {
+        &[
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+            "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+        ]
+    };
+    let regular = candidates
+        .iter()
+        .find_map(|p| std::fs::read(p).ok())
+        .unwrap_or_else(|| include_bytes!("../assets/fallback_font.ttf").to_vec());
+    FontSet {
+        regular,
+        bold: None,
+    }
+}

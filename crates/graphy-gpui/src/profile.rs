@@ -141,6 +141,14 @@ pub trait GraphProfile {
         None
     }
 
+    /// Commands that bring `node`'s pins in line with its properties. The
+    /// default turns a [`refresh_pins`](Self::refresh_pins) difference into one
+    /// `SetPins`; override it when the pins' *ids* change with the properties
+    /// and the wires on them must follow rather than be dropped.
+    fn pin_commands(&self, graph: &GraphDescription, node: &str) -> Vec<graphy::GraphCommand> {
+        set_pins_commands(self.refresh_pins(graph, node), graph, node)
+    }
+
     /// Whether `node` may be deleted (structural nodes such as a macro's
     /// entry and exit may not).
     fn is_deletable(&self, _node: &NodeInstance) -> bool {
@@ -224,7 +232,15 @@ pub fn dynamic_pin_commands(
     graph: &GraphDescription,
     node: &str,
 ) -> Vec<graphy::GraphCommand> {
-    let Some(update) = profile.refresh_pins(graph, node) else {
+    profile.pin_commands(graph, node)
+}
+
+fn set_pins_commands(
+    update: Option<PinUpdate>,
+    graph: &GraphDescription,
+    node: &str,
+) -> Vec<graphy::GraphCommand> {
+    let Some(update) = update else {
         return Vec::new();
     };
     let Some(current) = graph.nodes.get(node) else {
