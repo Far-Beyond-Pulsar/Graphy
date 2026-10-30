@@ -453,6 +453,7 @@ name = "graphy"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "graphy-blueprint",
  "quote",
  "rayon",
  "rustc-hash 2.1.1",
