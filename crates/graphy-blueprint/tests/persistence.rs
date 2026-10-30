@@ -93,3 +93,27 @@ fn malformed_pins_versions_and_variable_ids_are_reported() {
         .unwrap_err()
         .contains("duplicate id"));
 }
+
+#[test]
+fn trait_references_round_trip_and_stay_optional() {
+    // An asset saved before trait ids existed names traits by path only.
+    let mut legacy: Value = serde_json::from_str(FIXTURE).unwrap();
+    legacy["blueprint_metadata"]["implemented_traits"] = json!(["types/traits/a.trait.json"]);
+    legacy["blueprint_metadata"]
+        .as_object_mut()
+        .unwrap()
+        .remove("implemented_trait_ids");
+    let asset = deserialize_blueprint(&legacy.to_string()).unwrap();
+    assert_eq!(asset.blueprint_metadata.implemented_traits.len(), 1);
+    assert!(asset.blueprint_metadata.implemented_trait_ids.is_empty());
+    let saved = serde_json::to_value(&asset).unwrap();
+    assert!(saved["blueprint_metadata"].get("implemented_trait_ids").is_none());
+
+    let mut migrated = asset;
+    migrated.blueprint_metadata.implemented_trait_ids = vec!["id-1".to_owned()];
+    let saved = serde_json::to_value(&migrated).unwrap();
+    assert_eq!(saved["blueprint_metadata"]["implemented_trait_ids"], json!(["id-1"]));
+    let back = deserialize_blueprint(&saved.to_string()).unwrap();
+    assert_eq!(back.blueprint_metadata.implemented_trait_ids, ["id-1"]);
+    assert_eq!(back.blueprint_metadata.implemented_traits, ["types/traits/a.trait.json"]);
+}

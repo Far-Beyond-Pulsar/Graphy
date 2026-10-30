@@ -30,10 +30,22 @@ pub struct BlueprintMetadata {
     #[serde(default)]
     pub tags: Vec<String>,
 
-    /// Normalized project-relative `.trait.json` assets implemented by this
-    /// Blueprint. Legacy assets omit this field and deserialize as empty.
+    /// Normalized project-relative `.trait.json` paths of the traits this
+    /// Blueprint implements, as of its last save. A hint for readers that
+    /// predate trait ids, and the fallback when an id does not resolve: the
+    /// trait may since have been renamed or moved, so `implemented_trait_ids`
+    /// is authoritative.
+    ///
+    /// Legacy assets omit this field and deserialize as empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub implemented_traits: Vec<String>,
+
+    /// Stable ids of the traits this Blueprint implements; they survive the
+    /// trait asset being renamed or moved. Assets saved before trait ids
+    /// existed omit this and reference traits by path alone, which still
+    /// resolves until the next save writes ids.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub implemented_trait_ids: Vec<String>,
 }
 
 impl Default for BlueprintMetadata {
@@ -45,6 +57,7 @@ impl Default for BlueprintMetadata {
             category: "Uncategorized".to_string(),
             tags: Vec::new(),
             implemented_traits: Vec::new(),
+            implemented_trait_ids: Vec::new(),
         }
     }
 }
