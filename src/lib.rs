@@ -84,6 +84,7 @@ pub use core::{
     GraphDescription,
     GraphMetadata,
     GraphZipTie,
+    DEFAULT_ZIP_TIE_STRAIGHT_LENGTH,
     JsonValue,
     NodeInstance,
     // v2 types

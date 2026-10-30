@@ -810,6 +810,7 @@ fn is_incremental(c: &GraphChange) -> bool {
             | GraphChange::PinsReplaced { .. }
             | GraphChange::ZipTieAdded { .. }
             | GraphChange::ZipTieMoved { .. }
+            | GraphChange::ZipTieStraightLengthChanged { .. }
             | GraphChange::ZipTieRemoved { .. },
     )}
 
