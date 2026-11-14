@@ -42,6 +42,14 @@ pub struct LayoutMetrics {
     pub pill_height: f32,
     pub comment_header_h: f32,
     pub comment_resize_handle: f32,
+    /// Hide the pins a presenter calls quiet while nothing is wired to them
+    /// ([`crate::Presenter::pin_quiet`]); a node says how many it hides.
+    pub hide_quiet_pins: bool,
+    /// Space pins by the smallest card's height: every pin row is as tall as a
+    /// one-pin node, so a small node placed at its pin's height tiles with its
+    /// neighbours and the wires between them stay straight (graph-wide,
+    /// see [`LayoutMetrics::spaced_row_h`]).
+    pub space_pins: bool,
 }
 
 impl Default for LayoutMetrics {
@@ -67,11 +75,35 @@ impl Default for LayoutMetrics {
             pill_height: 22.0,
             comment_header_h: 24.0,
             comment_resize_handle: 14.0,
+            hide_quiet_pins: false,
+            space_pins: false,
         }
     }
 }
 
 impl LayoutMetrics {
+    /// Height of the smallest card: a header and one pin row.
+    pub fn min_node_height(&self) -> f32 {
+        self.snap_up(self.header_h + self.body_pad_y * 2.0 + self.row_h)
+    }
+
+    /// The height every pin row takes while [`space_pins`](Self::space_pins) is
+    /// on: the smallest card's height, so the pitch between two pins of one
+    /// node is the room a one-pin node needs.
+    pub fn spaced_row_h(&self) -> f32 {
+        self.min_node_height()
+    }
+
+    /// Distance between neighbouring pins of a node, graph units.
+    pub fn pin_pitch(&self) -> f32 {
+        let row = if self.space_pins {
+            self.row_h.max(self.spaced_row_h())
+        } else {
+            self.row_h
+        };
+        row + self.row_gap
+    }
+
     /// Rounds `value` up to the grid so node sizes align with snapping.
     pub fn snap_up(&self, value: f32) -> f32 {
         (value / self.grid_snap).ceil() * self.grid_snap
@@ -159,10 +191,23 @@ impl NodeSpec {
         outputs: usize,
         header_output: Option<usize>,
         extras: &[ExtraRow],
+        height_of: impl FnMut(&RowContent) -> f32,
+    ) -> (Vec<RowSpec>, f32) {
+        let inputs: Vec<usize> = (0..inputs).collect();
+        let outputs: Vec<usize> = (0..outputs).filter(|o| Some(*o) != header_output).collect();
+        Self::build_rows_of(&inputs, &outputs, extras, height_of)
+    }
+
+    /// [`build_rows`](Self::build_rows) for the pins that are shown: `inputs` and
+    /// `outputs` are the indices of the pins that get a row (a hidden pin has
+    /// none), paired row by row.
+    pub fn build_rows_of(
+        inputs: &[usize],
+        outputs: &[usize],
+        extras: &[ExtraRow],
         mut height_of: impl FnMut(&RowContent) -> f32,
     ) -> (Vec<RowSpec>, f32) {
-        let body_outputs: Vec<usize> = (0..outputs).filter(|o| Some(*o) != header_output).collect();
-        let pin_rows = inputs.max(body_outputs.len());
+        let pin_rows = inputs.len().max(outputs.len());
         let mut rows = Vec::with_capacity(pin_rows + extras.len());
         let mut min_width = 0.0f32;
         let push_extras = |rows: &mut Vec<RowSpec>, pos: RowPosition, min_width: &mut f32| {
@@ -177,8 +222,8 @@ impl NodeSpec {
         push_extras(&mut rows, RowPosition::Top, &mut min_width);
         for r in 0..pin_rows {
             let content = RowContent::Pins {
-                input: (r < inputs).then_some(r),
-                output: body_outputs.get(r).copied(),
+                input: inputs.get(r).copied(),
+                output: outputs.get(r).copied(),
             };
             let height = height_of(&content);
             rows.push(RowSpec { content, height });

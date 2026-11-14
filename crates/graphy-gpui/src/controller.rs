@@ -223,6 +223,8 @@ pub struct Controller {
     clipboard: Option<String>,
     /// Live while zip-tying: (drag start, current graph point).
     zip_lasso: Option<(Vec2, Vec2)>,
+    /// Selecting, panning and zooming only: no drag, connect, resize or tie starts.
+    pub read_only: bool,
 }
 
 impl Controller {
@@ -241,7 +243,13 @@ impl Controller {
             compatible: HashSet::new(),
             clipboard: None,
             zip_lasso: None,
+            read_only: false,
         }
+    }
+
+    /// What the pointer rests on, as of the last move.
+    pub fn hovered(&self) -> Option<Hit> {
+        self.hover
     }
 
     pub fn is_dragging(&self) -> bool {
@@ -439,8 +447,24 @@ impl Controller {
     ) {
         let g = self.graph_pos(pos);
         self.cursor_graph = g;
-        let hit = cx.scene.hit_test(g, self.view.zoom, self.tolerance());
+        let mut hit = cx.scene.hit_test(g, self.view.zoom, self.tolerance());
         out.redraw = true;
+        if self.read_only {
+            // Nothing that edits may start; a node can still be selected.
+            if !matches!(hit, Hit::Node { .. }) && button != MouseButton::Right {
+                hit = Hit::None;
+            }
+            if button == MouseButton::Middle {
+                self.mode = Mode::Pan {
+                    last: pos,
+                    button,
+                    start: pos,
+                    moved: false,
+                    target: MenuTarget::Canvas { graph_pos: g },
+                };
+                return;
+            }
+        }
         match button {
             MouseButton::Middle => match hit {
                 Hit::ZipTie(index) => {
@@ -621,11 +645,13 @@ impl Controller {
                 } else {
                     self.focused = Some(id.clone());
                 }
-                self.mode = Mode::PendingNode {
-                    node,
-                    down_screen: pos,
-                    toggle_off: mods.additive() && was_selected,
-                };
+                if !self.read_only {
+                    self.mode = Mode::PendingNode {
+                        node,
+                        down_screen: pos,
+                        toggle_off: mods.additive() && was_selected,
+                    };
+                }
             }
             Hit::CommentHeader(i) => {
                 let c = &cx.scene.comments[i];

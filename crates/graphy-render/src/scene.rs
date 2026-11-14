@@ -7,12 +7,12 @@
 //! nodes in the scene transiently ([`Scene::set_node_position`]) and commits
 //! one command on release.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use graphy::{ChangeSet, GraphChange, GraphDescription};
 
 use crate::geom::{Rect, Vec2};
-use crate::layout::{LayoutMetrics, NodeLayout, NodeShape, NodeSpec, PinSide};
+use crate::layout::{LayoutMetrics, NodeLayout, NodeShape, NodeSpec, PinSide, RowContent};
 use crate::presenter::{CommentPresentation, NodePresentation, PinStyle, Presenter, WireStyle};
 use crate::spatial::{Entry, SpatialIndex};
 use crate::text::TextMeasure;
@@ -64,6 +64,9 @@ pub struct PinInfo {
     pub label: String,
     pub style: PinStyle,
     pub connected: bool,
+    /// Not shown: a quiet pin nothing is wired to while the graph hides them.
+    /// It has no row, no position and no hit area.
+    pub hidden: bool,
     /// Inline value chip shown after the label while the input is unconnected.
     pub widget: Option<crate::presenter::PinWidget>,
     /// Measured label width (capped), graph units.
@@ -87,6 +90,9 @@ impl SceneNode {
 
     /// Graph-space pin centre.
     pub fn pin_pos(&self, side: PinSide, index: usize) -> Option<Vec2> {
+        if self.pins(side).get(index).is_some_and(|p| p.hidden) {
+            return None;
+        }
         self.layout.pin(side, index).map(|p| self.pos + p.center)
     }
 
@@ -243,9 +249,10 @@ impl Scene {
     ) {
         let mut ids: Vec<&String> = graph.nodes.keys().collect();
         ids.sort();
+        let wired = wired_pins(graph);
         self.nodes = ids
             .iter()
-            .map(|id| build_node(&graph.nodes[*id], &self.metrics, presenter, measure))
+            .map(|id| build_node(&graph.nodes[*id], &self.metrics, presenter, measure, &wired))
             .collect();
         self.node_ix = self
             .nodes
@@ -657,7 +664,15 @@ impl Scene {
                 GraphChange::NodeAdded(_) | GraphChange::NodeRemoved { .. }
             )
         });
-        if structural || changes.changes.iter().any(|c| !is_incremental(c)) {
+        // A connection shows or hides the quiet pins at its ends, which relayouts them.
+        let rewires = self.metrics.hide_quiet_pins
+            && changes.changes.iter().any(|c| {
+                matches!(
+                    c,
+                    GraphChange::ConnectionAdded(_) | GraphChange::ConnectionRemoved(_)
+                )
+            });
+        if structural || rewires || changes.changes.iter().any(|c| !is_incremental(c)) {
             self.rebuild(graph, presenter, measure);
             return;
         }
@@ -741,7 +756,8 @@ impl Scene {
                     .map(|p| (PinSide::Output, p.id.clone())),
             )
             .collect();
-        self.nodes[i] = build_node(node, &self.metrics, presenter, measure);
+        let wired = wired_pins(graph);
+        self.nodes[i] = build_node(node, &self.metrics, presenter, measure, &wired);
         for (side, pid) in &was_connected {
             let n = &mut self.nodes[i];
             let list = if *side == PinSide::Input {
@@ -814,13 +830,28 @@ fn is_incremental(c: &GraphChange) -> bool {
             | GraphChange::ZipTieRemoved { .. },
     )}
 
+/// The `(node, pin)` pairs some connection ends at.
+fn wired_pins(graph: &GraphDescription) -> HashSet<(&str, &str)> {
+    graph
+        .connections
+        .iter()
+        .flat_map(|c| {
+            [
+                (c.source_node.as_str(), c.source_pin.as_str()),
+                (c.target_node.as_str(), c.target_pin.as_str()),
+            ]
+        })
+        .collect()
+}
+
 fn build_node(
     node: &graphy::NodeInstance,
     m: &LayoutMetrics,
     presenter: &dyn Presenter,
     measure: &dyn TextMeasure,
+    wired: &HashSet<(&str, &str)>,
 ) -> SceneNode {
-    let presentation = presenter.node(node);
+    let mut presentation = presenter.node(node);
     let pin_info = |list: &[graphy::PinInstance], side: PinSide| -> Vec<PinInfo> {
         list.iter()
             .map(|p| PinInfo {
@@ -828,6 +859,9 @@ fn build_node(
                 label: presenter.pin_label(node, p, side),
                 style: presenter.pin(node, p, side),
                 connected: false,
+                hidden: m.hide_quiet_pins
+                    && presenter.pin_quiet(node, p, side)
+                    && !wired.contains(&(node.id.as_str(), p.id.as_str())),
                 widget: if side == PinSide::Input {
                     presenter.pin_widget(node, p, side)
                 } else {
@@ -845,12 +879,29 @@ fn build_node(
     let label_w =
         |p: &PinInfo| p.label_width + p.widget.as_ref().map_or(0.0, |w| WIDGET_GAP + w.width);
     let header_output = presentation.header_output.filter(|h| *h < outputs.len());
-    let (rows, extra_min) = NodeSpec::build_rows(
-        inputs.len(),
-        outputs.len(),
-        header_output,
+    let shown_inputs: Vec<usize> = (0..inputs.len()).filter(|i| !inputs[*i].hidden).collect();
+    let shown_outputs: Vec<usize> = (0..outputs.len())
+        .filter(|o| Some(*o) != header_output && !outputs[*o].hidden)
+        .collect();
+    let hidden = inputs.iter().chain(&outputs).filter(|p| p.hidden).count();
+    if hidden > 0 && presentation.subtitle.is_none() {
+        presentation.subtitle = Some(format!("+{hidden} pins"));
+    }
+    let spaced = m.space_pins && shown_inputs.len().max(shown_outputs.len()) > 1;
+    let (rows, extra_min) = NodeSpec::build_rows_of(
+        &shown_inputs,
+        &shown_outputs,
         &presentation.extra_rows,
-        |c| presenter.row_height(node, c, m),
+        |c| {
+            let h = presenter.row_height(node, c, m);
+            // Only a node with several pin rows is spaced: the smallest card is
+            // the unit the spacing is measured in, so it must stay that size.
+            if spaced && matches!(c, RowContent::Pins { .. }) {
+                h.max(m.spaced_row_h())
+            } else {
+                h
+            }
+        },
     );
     // Rows carrying the header output's label would double-count; the header
     // output has no label slot.

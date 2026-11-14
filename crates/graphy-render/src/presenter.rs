@@ -20,6 +20,8 @@ pub enum PinShape {
     Diamond,
     Square,
     Hexagon,
+    /// A rounded screen, wider than tall: a frame buffer.
+    Screen,
 }
 
 impl PinShape {
@@ -31,6 +33,7 @@ impl PinShape {
             PinShape::Diamond => 2,
             PinShape::Square => 3,
             PinShape::Hexagon => 4,
+            PinShape::Screen => 5,
         }
     }
 }
@@ -129,6 +132,30 @@ pub trait Presenter {
         } else {
             pin.pin.name.clone()
         }
+    }
+
+    /// Text shown in the tooltip while the pointer rests on a pin: lines
+    /// separated by `\n`, the first one the title. `None` shows no tooltip.
+    /// The default names the pin and its type string (`Execution` for flow).
+    fn pin_tooltip(&self, node: &NodeInstance, pin: &PinInstance, side: PinSide) -> Option<String> {
+        let label = self.pin_label(node, pin, side);
+        let ty = match &pin.pin.data_type {
+            DataType::Exec => "Execution".to_string(),
+            DataType::Data(info) => info.type_string.clone(),
+        };
+        Some(if label.is_empty() {
+            ty
+        } else {
+            format!("{label}\n{ty}")
+        })
+    }
+
+    /// A pin that may be hidden while nothing is wired to it, when the graph
+    /// hides quiet pins ([`crate::LayoutMetrics::hide_quiet_pins`]): optional,
+    /// previous-frame and host-supplied inputs a pass has but rarely wires.
+    /// A wired pin is always shown.
+    fn pin_quiet(&self, _node: &NodeInstance, _pin: &PinInstance, _side: PinSide) -> bool {
+        false
     }
 
     /// Height of a pin row; override for variable-height rows.

@@ -77,6 +77,11 @@ fn pin_sd(shape: u32, p: vec2<f32>, r: f32) -> f32 {
             return length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0) - 1.4 * u.scale;
         }
         case 4u: { return sd_hexagon(p, r * 0.95); }
+        case 5u: {
+            // a screen: a rounded rectangle wider than tall
+            let q = abs(p) - vec2<f32>(r * 1.05, r * 0.72) + vec2<f32>(r * 0.3);
+            return length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0) - r * 0.3;
+        }
         default: { return length(p) - r; }
     }
 }

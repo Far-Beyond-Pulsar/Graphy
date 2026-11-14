@@ -27,7 +27,7 @@ use gpui::{
 };
 use ui::ActiveTheme;
 use graphy::{ChangeSet, EditError, GraphCommand, GraphDescription, PinRef};
-use graphy_render::{DrawParams, LayoutMetrics, LodTier, PinSide, Scene, Theme, Vec2};
+use graphy_render::{DrawParams, Hit, LayoutMetrics, LodTier, PinSide, Scene, Theme, Vec2};
 use graphy_render_wgpu::{FontMeasure, FontSet, Fonts, GraphRenderer};
 
 use crate::controller::{apply_transaction, Action, Controller, GraphCtx, Outcome};
@@ -168,6 +168,8 @@ pub struct GraphCanvas {
     cursor: CursorHint,
     theme: Theme,
     overlay: Option<Overlay>,
+    /// A read-only canvas shows, pans, zooms, selects and copies, but takes no edit.
+    read_only: bool,
 }
 
 impl EventEmitter<CanvasEvent> for GraphCanvas {}
@@ -263,7 +265,24 @@ impl GraphCanvas {
             cursor: CursorHint::Default,
             theme,
             overlay: None,
+            read_only: false,
         })
+    }
+
+    /// Whether edits are refused (a file the host cannot write).
+    pub fn read_only(&self) -> bool {
+        self.read_only
+    }
+
+    /// Makes the canvas read-only: every edit, node picker and rename is
+    /// refused, and the graph is drawn dimmed.
+    pub fn set_read_only(&mut self, on: bool, cx: &mut Context<Self>) {
+        if self.read_only != on {
+            self.read_only = on;
+            self.controller.read_only = on;
+            self.overlay = None;
+            cx.notify();
+        }
     }
 
     pub fn theme(&self) -> &Theme {
@@ -368,6 +387,34 @@ impl GraphCanvas {
         cx.notify();
     }
 
+    /// Whether pins are spaced by the smallest card's height (a graph-wide
+    /// layout option, see [`graphy_render::LayoutMetrics::space_pins`]).
+    pub fn space_pins(&self) -> bool {
+        self.scene.metrics.space_pins
+    }
+
+    /// Turns pin spacing on or off for the whole graph. Cheap when unchanged.
+    pub fn set_space_pins(&mut self, on: bool, cx: &mut Context<Self>) {
+        if self.scene.metrics.space_pins != on {
+            self.scene.metrics.space_pins = on;
+            self.refresh_scene(cx);
+        }
+    }
+
+    /// Whether pins a presenter calls quiet are hidden while nothing is wired to
+    /// them ([`graphy_render::LayoutMetrics::hide_quiet_pins`]).
+    pub fn hide_quiet_pins(&self) -> bool {
+        self.scene.metrics.hide_quiet_pins
+    }
+
+    /// Hides or shows the quiet pins of every node. Cheap when unchanged.
+    pub fn set_hide_quiet_pins(&mut self, on: bool, cx: &mut Context<Self>) {
+        if self.scene.metrics.hide_quiet_pins != on {
+            self.scene.metrics.hide_quiet_pins = on;
+            self.refresh_scene(cx);
+        }
+    }
+
     /// Replaces the document (load, revert). Selection is cleared.
     pub fn set_graph(&mut self, graph: GraphDescription, cx: &mut Context<Self>) {
         self.graph = graph;
@@ -385,6 +432,14 @@ impl GraphCanvas {
         commands: &[GraphCommand],
         cx: &mut Context<Self>,
     ) -> Result<(), EditError> {
+        if self.read_only {
+            // A drag may have moved nodes in the scene already: redraw the document.
+            self.scene
+                .rebuild(&self.graph, self.profile.presenter(), &self.measure);
+            cx.emit(CanvasEvent::Rejected("this graph is read-only".into()));
+            cx.notify();
+            return Ok(());
+        }
         match apply_transaction(&mut self.graph, commands) {
             Ok(changes) => {
                 self.overlay = None;
@@ -458,6 +513,12 @@ impl GraphCanvas {
                 Action::ClipboardWrite(text) => {
                     cx.write_to_clipboard(ClipboardItem::new_string(text))
                 }
+                Action::ClipboardReadRequest if self.read_only => {}
+                Action::EditPinWidget { .. }
+                | Action::CommentActivated(_)
+                | Action::SlotPressed { .. }
+                | Action::Custom { .. }
+                    if self.read_only => {}
                 Action::ClipboardReadRequest => {
                     if let Some(text) = cx.read_from_clipboard().and_then(|i| i.text()) {
                         followups.push(InputEvent::Paste(text));
@@ -530,6 +591,9 @@ impl GraphCanvas {
         source: Option<PinRef>,
         cx: &mut Context<Self>,
     ) {
+        if self.read_only {
+            return;
+        }
         let mut entries = self.profile.catalog();
         let mut chip = None;
         if let Some(from) = &source {
@@ -677,6 +741,62 @@ impl GraphCanvas {
                 Some(shell(*at, 1, body))
             }
         }
+    }
+
+    /// The tooltip of the pin under the pointer, anchored beside the pin. Not
+    /// shown over a popup or while a drag is in progress.
+    fn pin_tooltip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.overlay.is_some() || self.controller.is_dragging() {
+            return None;
+        }
+        let Some(Hit::Pin(addr)) = self.controller.hovered() else {
+            return None;
+        };
+        let node = self.scene.nodes.get(addr.node)?;
+        let instance = self.graph.nodes.get(&node.id)?;
+        let pins = match addr.side {
+            PinSide::Input => &instance.inputs,
+            PinSide::Output => &instance.outputs,
+        };
+        let pin = pins.get(addr.pin)?;
+        let text = self
+            .profile
+            .presenter()
+            .pin_tooltip(instance, pin, addr.side)?;
+        let at = self.controller.view.graph_to_screen(node.pin_pos(addr.side, addr.pin)?);
+        let position = self.local_to_window(Vec2::new(at.x + 14.0, at.y + 14.0));
+        let mut lines = text.lines();
+        let title = lines.next().unwrap_or_default().to_string();
+        let mut body = gpui::div()
+            .px(px(8.0))
+            .py(px(5.0))
+            .bg(cx.theme().popover)
+            .border_1()
+            .border_color(cx.theme().border)
+            .rounded(px(5.0))
+            .shadow_md()
+            .text_sm()
+            .text_color(cx.theme().popover_foreground)
+            .child(SharedString::from(title));
+        for line in lines {
+            body = body.child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(SharedString::from(line.to_string())),
+            );
+        }
+        Some(
+            deferred(
+                anchored()
+                    .position(position)
+                    .snap_to_window_with_margin(px(8.0))
+                    .anchor(gpui::Corner::TopLeft)
+                    .child(body),
+            )
+            .with_priority(3)
+            .into_any_element(),
+        )
     }
 
     // ------------------------------------------------------------- drawing
@@ -1016,7 +1136,15 @@ impl Render for GraphCanvas {
             .child(display)
             .child(driver)
             .children(slots)
+            .children(self.read_only.then(|| {
+                // The dimming tint over the graph and its host rows; input passes through.
+                div()
+                    .absolute()
+                    .inset_0()
+                    .bg(gpui::hsla(0.0, 0.0, 0.0, 0.22))
+            }))
             .children(self.popup(cx))
+            .children(self.pin_tooltip(cx))
             .on_mouse_down(GpuiButton::Left, down.clone())
             .on_mouse_down(GpuiButton::Right, down.clone())
             .on_mouse_down(GpuiButton::Middle, down)

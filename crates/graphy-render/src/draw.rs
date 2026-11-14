@@ -640,7 +640,21 @@ impl Scene {
             } else {
                 m.header_pad_x
             };
-            let max_w = (rect.max.x - right_pad - x).max(0.0);
+            let sub_w = pres
+                .subtitle
+                .as_deref()
+                .map_or(0.0, |t| measure.width(t, m.label_font) + 10.0);
+            let max_w = (rect.max.x - right_pad - x - sub_w).max(0.0);
+            if let Some(subtitle) = &pres.subtitle {
+                out.texts.push(TextDraw {
+                    text: subtitle.clone(),
+                    pos: Vec2::new(rect.max.x - right_pad, rect.min.y + m.header_h * 0.5),
+                    size: m.label_font,
+                    color: theme.text_dim,
+                    align: TextAlign::Right,
+                    bold: false,
+                });
+            }
             out.texts.push(TextDraw {
                 text: fit_text(measure, &pres.title, title_size, max_w),
                 pos: Vec2::new(x, rect.min.y + m.header_h * 0.5),
