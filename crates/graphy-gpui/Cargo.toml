@@ -30,14 +30,14 @@ wgpu = { version = "30.0.0", default-features = false, features = ["wgsl"], opti
 # Pulsar-Native pins as submodules; Pulsar patches both sources onto those
 # submodules. Never from Pulsar-Native itself: a git dependency on it fetches
 # the whole engine and its submodules (Pulsar-Native#1662).
-gpui = { package = "gpui-ce", git = "https://github.com/Far-Beyond-Pulsar/WGPUI", rev = "9a2fcfe1c1067a5f5a26436d41303726393876c9", optional = true }
+gpui = { package = "gpui-ce", git = "https://github.com/Far-Beyond-Pulsar/WGPUI", rev = "f0aa74604df9e2f6a319a7628ed805f40f387355", optional = true }
 ui = { git = "https://github.com/Far-Beyond-Pulsar/WGPUI-Component", rev = "49a13fed2a5a07354c38fd0e79943f0e09a8b326", optional = true }
 
 # WGPUI-Component pins its own WGPUI rev; one gpui-ce for the whole graph. The
 # `//` spelling is the same repository as a distinct source, which is what
 # lets a patch name it.
 [patch."https://github.com/Far-Beyond-Pulsar/WGPUI"]
-gpui-ce = { git = "https://github.com//Far-Beyond-Pulsar/WGPUI", rev = "9a2fcfe1c1067a5f5a26436d41303726393876c9" }
+gpui-ce = { git = "https://github.com//Far-Beyond-Pulsar/WGPUI", rev = "f0aa74604df9e2f6a319a7628ed805f40f387355" }
 
 # The wgpu fork Helio and Pulsar-Native link; graphy-render-wgpu must use the
 # same wgpu types as the window's surface.
