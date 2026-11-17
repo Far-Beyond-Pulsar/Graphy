@@ -25,20 +25,27 @@ serde_json = "1"
 
 graphy-render-wgpu = { path = "../graphy-render-wgpu", optional = true }
 wgpu = { version = "30.0.0", default-features = false, features = ["wgsl"], optional = true }
-gpui = { package = "gpui-ce", git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef", optional = true }
-# The editors' UI toolkit: the shared picker and menu look like the rest of the app.
-ui = { git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef", optional = true }
+# The gpui fork and the editors' UI toolkit (the shared picker and menu look
+# like the rest of the app), each from its own repository at the revs
+# Pulsar-Native pins as submodules; Pulsar patches both sources onto those
+# submodules. Never from Pulsar-Native itself: a git dependency on it fetches
+# the whole engine and its submodules (Pulsar-Native#1662).
+gpui = { package = "gpui-ce", git = "https://github.com/Far-Beyond-Pulsar/WGPUI", rev = "9a2fcfe1c1067a5f5a26436d41303726393876c9", optional = true }
+ui = { git = "https://github.com/Far-Beyond-Pulsar/WGPUI-Component", rev = "49a13fed2a5a07354c38fd0e79943f0e09a8b326", optional = true }
 
+# WGPUI-Component pins its own WGPUI rev; one gpui-ce for the whole graph. The
+# `//` spelling is the same repository as a distinct source, which is what
+# lets a patch name it.
 [patch."https://github.com/Far-Beyond-Pulsar/WGPUI"]
-gpui-ce = { git = "https://github.com/Far-Beyond-Pulsar/Pulsar-Native", rev = "3ffbecda91982c3997ebff801c5b872df0a455ef" }
+gpui-ce = { git = "https://github.com//Far-Beyond-Pulsar/WGPUI", rev = "9a2fcfe1c1067a5f5a26436d41303726393876c9" }
 
-# The gpui fork links the reusable-command-buffer wgpu fork; graphy-render-wgpu
-# must use the same wgpu types as the window's surface.
+# The wgpu fork Helio and Pulsar-Native link; graphy-render-wgpu must use the
+# same wgpu types as the window's surface.
 [patch.crates-io]
-naga = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
-wgpu = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
-wgpu-core = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
-wgpu-core-deps-windows-linux-android = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
-wgpu-hal = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
-wgpu-naga-bridge = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
-wgpu-types = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1-reusable-command-buffers" }
+naga = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1" }
+wgpu = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1" }
+wgpu-core = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1" }
+wgpu-core-deps-windows-linux-android = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1" }
+wgpu-hal = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1" }
+wgpu-naga-bridge = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1" }
+wgpu-types = { git = "https://github.com/Far-Beyond-Pulsar/wgpu", branch = "helio/v30.0.1" }
