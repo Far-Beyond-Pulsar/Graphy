@@ -32,7 +32,7 @@ use graphy_render_wgpu::{FontMeasure, FontSet, Fonts, GraphRenderer};
 
 use crate::controller::{apply_transaction, Action, Controller, GraphCtx, Outcome};
 use crate::input::{CursorHint, InputEvent, Key, Modifiers, MouseButton};
-use crate::picker::{DragChip, NodePicker, PickerEvent, PICKER_SIZE};
+use crate::picker::{CatalogFeed, DragChip, NodePicker, PickerEvent, PICKER_SIZE};
 use crate::profile::{CatalogEntry, GraphProfile, MenuItem, MenuTarget};
 
 /// Width of a context menu.
@@ -102,7 +102,7 @@ enum Overlay {
         graph_pos: Vec2,
         source: Option<PinRef>,
         /// Entries to build the picker from; taken once a window is at hand.
-        init: Option<(Vec<CatalogEntry>, Option<DragChip>)>,
+        init: Option<(Vec<CatalogEntry>, Option<DragChip>, CatalogFeed)>,
         view: Option<Entity<NodePicker>>,
         focus_pending: bool,
         subscription: Option<Subscription>,
@@ -596,6 +596,7 @@ impl GraphCanvas {
         }
         let mut entries = self.profile.catalog();
         let mut chip = None;
+        let mut from_type_filter: Option<graphy::DataType> = None;
         if let Some(from) = &source {
             let from_type = self
                 .graph
@@ -604,6 +605,7 @@ impl GraphCanvas {
                 .and_then(|n| n.outputs.iter().find(|p| p.id == from.pin))
                 .map(|p| p.data_type().clone());
             if let Some(from_type) = from_type {
+                from_type_filter = Some(from_type.clone());
                 entries = crate::catalog::filter_for_drag(&*self.profile, entries, &from_type);
                 chip = Some(DragChip {
                     label: match from_type.type_info() {
@@ -618,12 +620,34 @@ impl GraphCanvas {
             at,
             graph_pos,
             source,
-            init: Some((entries, chip)),
+            init: Some((entries, chip, self.catalog_feed(from_type_filter))),
             view: None,
             focus_pending: true,
             subscription: None,
         });
         cx.notify();
+    }
+
+    /// How an open picker follows the profile's catalogue: the entries as they
+    /// are now (narrowed to `from` when a wire opened it), their version, and
+    /// whether more are still loading.
+    fn catalog_feed(&self, from: Option<graphy::DataType>) -> CatalogFeed {
+        let (version, loading, entries) = (
+            self.profile.clone(),
+            self.profile.clone(),
+            self.profile.clone(),
+        );
+        CatalogFeed {
+            version: Box::new(move || version.catalog_version()),
+            loading: Box::new(move || loading.catalog_loading()),
+            entries: Box::new(move || {
+                let all = entries.catalog();
+                match &from {
+                    Some(from) => crate::catalog::filter_for_drag(&*entries, all, from),
+                    None => all,
+                }
+            }),
+        }
     }
 
     /// Runs a menu item of the open context menu, then closes it.
@@ -641,10 +665,10 @@ impl GraphCanvas {
         let Some(Overlay::Picker { init, .. }) = &mut self.overlay else {
             return;
         };
-        let Some((entries, chip)) = init.take() else {
+        let Some((entries, chip, feed)) = init.take() else {
             return;
         };
-        let picker = cx.new(|cx| NodePicker::new(entries, chip, window, cx));
+        let picker = cx.new(|cx| NodePicker::new(entries, chip, window, cx).with_feed(feed));
         let subscription = cx.subscribe(&picker, |this, _, event: &PickerEvent, cx| {
             let Some(Overlay::Picker {
                 graph_pos, source, ..

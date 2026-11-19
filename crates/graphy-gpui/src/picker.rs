@@ -10,10 +10,12 @@
 
 use std::collections::HashSet;
 use std::rc::Rc;
+use std::time::Duration;
 
 use gpui::prelude::*;
 use gpui::{
-    div, px, size, AnyElement, App, Context, Entity, EventEmitter, FocusHandle, Focusable, Hsla,
+    div, px, radians, size, AnyElement, Animation, AnimationExt, App, Context, Entity, EventEmitter,
+    FocusHandle, Focusable, Hsla,
     KeyDownEvent, MouseButton, Pixels, Render, Rgba, ScrollStrategy, SharedString, Size,
     Subscription, Window,
 };
@@ -56,8 +58,26 @@ pub struct DragChip {
     pub color: Option<Color>,
 }
 
+/// Where an open picker learns that its catalogue grew: a profile whose catalogue
+/// loads in the background (see `GraphProfile::catalog_loading`). The picker
+/// lists what is known when it opens, shows a loading indicator, and adds the
+/// rest as it arrives, without the host re-opening it.
+pub struct CatalogFeed {
+    /// Changes whenever the catalogue does; cheap to ask every frame.
+    pub version: Box<dyn Fn() -> u64>,
+    /// Whether more entries are still coming.
+    pub loading: Box<dyn Fn() -> bool>,
+    /// The whole catalogue as it is now (narrowed the way the picker was opened).
+    pub entries: Box<dyn Fn() -> Vec<CatalogEntry>>,
+}
+
 pub struct NodePicker {
     entries: Vec<CatalogEntry>,
+    feed: Option<CatalogFeed>,
+    /// The feed version `entries` is from.
+    version: u64,
+    /// More entries are still being loaded: the header shows a throbber.
+    loading: bool,
     chip: Option<DragChip>,
     focus: FocusHandle,
     search: Entity<InputState>,
@@ -97,6 +117,9 @@ impl NodePicker {
         );
         Self {
             entries,
+            feed: None,
+            version: 0,
+            loading: false,
             chip,
             focus: cx.focus_handle(),
             search,
@@ -105,6 +128,29 @@ impl NodePicker {
             expanded: HashSet::new(),
             _subscription: subscription,
         }
+    }
+
+    /// Follows `feed`: the entries and the loading indicator track it every
+    /// frame.
+    pub fn with_feed(mut self, feed: CatalogFeed) -> Self {
+        self.version = (feed.version)();
+        self.loading = (feed.loading)();
+        self.feed = Some(feed);
+        self
+    }
+
+    /// Takes what the feed has now: new entries when its version moved, and
+    /// whether more are coming.
+    fn poll_feed(&mut self) {
+        let Some(feed) = &self.feed else {
+            return;
+        };
+        let version = (feed.version)();
+        if version != self.version {
+            self.entries = (feed.entries)();
+            self.version = version;
+        }
+        self.loading = (feed.loading)();
     }
 
     /// Replaces the catalogue (the host's entries changed), keeping the query.
@@ -145,6 +191,8 @@ fn item_sizes(rows: &[Row]) -> Rc<Vec<Size<Pixels>>> {
 
 impl Render for NodePicker {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.poll_feed();
+        let loading = self.loading;
         let query = self.search.read(cx).value().to_string();
         // Opened by a dropped wire: the list is already narrowed to what fits, so
         // every category opens.
@@ -199,7 +247,28 @@ impl Render for NodePicker {
                                             .font_weight(gpui::FontWeight::SEMIBOLD)
                                             .text_color(cx.theme().foreground)
                                             .child("Palette"),
-                                    ),
+                                    )
+                                    // More nodes are still loading (files read in
+                                    // the background): the list grows as they
+                                    // arrive. The animation keeps frames coming,
+                                    // so the new entries show up by themselves.
+                                    .when(loading, |row| {
+                                        row.child(
+                                            Icon::new(IconName::Loader)
+                                                .size(px(12.0))
+                                                .text_color(cx.theme().muted_foreground)
+                                                .with_animation(
+                                                    "palette-loading",
+                                                    Animation::new(Duration::from_millis(900))
+                                                        .repeat(),
+                                                    |icon, phase| {
+                                                        icon.rotate(radians(
+                                                            phase * std::f32::consts::TAU,
+                                                        ))
+                                                    },
+                                                ),
+                                        )
+                                    }),
                             )
                             .child(
                                 h_flex()

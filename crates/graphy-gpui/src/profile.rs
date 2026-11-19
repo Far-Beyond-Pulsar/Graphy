@@ -139,6 +139,19 @@ pub trait GraphProfile {
         Vec::new()
     }
 
+    /// Whether entries are still being added to [`catalog`](Self::catalog): a
+    /// slow source (files read, assets scanned) loads in the background and the
+    /// node picker lists what is known meanwhile, with a loading indicator.
+    fn catalog_loading(&self) -> bool {
+        false
+    }
+
+    /// Changes whenever [`catalog`](Self::catalog) does, so an open picker knows
+    /// to list the new entries without asking for the whole catalogue each frame.
+    fn catalog_version(&self) -> u64 {
+        0
+    }
+
     /// Whether (and how) a catalogue entry takes a wire dragged from an output of
     /// type `from`. The default asks the type resolver about the entry's input
     /// pins (`entry.inputs`, or those of a probe node from [`Self::create_node`]).
